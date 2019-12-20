@@ -24,6 +24,7 @@
 set -ex
 
 readonly SRCDIR="${PWD}"
+readonly DESTDIR="${SRCDIR}/$1"
 readonly WORKDIR="$(mktemp -d)"
 
 echo "Working in ${WORKDIR}"
@@ -55,9 +56,8 @@ echo 'load_module modules/ngx_http_sxg_filter_module.so;' \
 
 debuild -us -uc
 
-cd ..
-
-mv libnginx-mod-http-sxg-filter_*.deb "${SRCDIR}"
+mv ../libnginx-mod-http-sxg-filter_*.deb "${DESTDIR}"
+cd ../..
 rm -rf "${WORKDIR}"
 
 echo "Successfully generated .deb file"

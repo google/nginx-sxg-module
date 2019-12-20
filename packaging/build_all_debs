@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Copyright 2019 Google Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Description:
+# Builds the libsxg deb packages for multiple debian family OS with Docker.
+# This script must be run at the root directory of the nginx-sxg source tree.
+# Generated deb packages will put in the directory with the same name of
+# Dockerfiles.
+#
+# Requirements:
+# This script requires docker container images built by libsxg.
+# These images can be built in libsxg repository at github.com/google/libsxg
+# with running below build script its root directory
+# ./packaging/build_all_debs
+
+set -ex
+readonly DEB_DOCKER="packaging/dockerfiles/deb.dockerfile"
+
+declare -ar DISTROS=(
+  debian:buster-slim
+  debian:stretch-slim
+  ubuntu:disco
+  ubuntu:bionic
+)
+
+for distro in ${DISTROS[@]}; do
+  libsxg_distro="${distro}-libsxg"
+  image_tag="${libsxg_distro}-nginx"
+  echo "Target: ${libsxg_distro}"
+  docker build --build-arg base_image=${libsxg_distro} -t "${image_tag}" \
+    -f "${DEB_DOCKER}" .
+  docker run --rm \
+    --mount "type=bind,source=${PWD},target=/nginx-sxg-module/docker_output" \
+    "${image_tag}"
+  echo "Wrote deb file in ${PWD}"
+done
+
