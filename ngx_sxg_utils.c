@@ -27,6 +27,8 @@
 #include "openssl/pem.h"
 #endif
 
+#include "libsxg.h"
+
 size_t get_term_length(const char* str, size_t len, char delimiter,
                        const char quotes[2]) {
   bool inside_quote = false;
@@ -231,4 +233,30 @@ X509* load_x509_cert(const char* filepath) {
   X509* cert = PEM_read_X509(certfile, 0, 0, &passwd);
   fclose(certfile);
   return cert;
+}
+
+bool load_cert_chain(const char* cert_path, const char* key_path,
+                     sxg_buffer_t* dst) {
+  EVP_PKEY* private_key = load_private_key(key_path);
+  FILE* certfile = fopen(cert_path, "r");
+  if (!certfile) {
+    return false;
+  }
+  char passwd = 0;
+  sxg_buffer_t sct_list = sxg_empty_buffer();
+  sxg_cert_chain_t chain = sxg_empty_cert_chain();
+  OCSP_RESPONSE* ocsp = NULL;
+  X509* cert = PEM_read_X509(certfile, 0, 0, &passwd);
+  X509* issuer = PEM_read_X509(certfile, 0, 0, &passwd);
+  fclose(certfile);
+  bool success =
+      (cert != NULL) && (issuer != NULL) &&
+      sxg_fetch_ocsp_response(cert, issuer, &ocsp) &&
+      sxg_cert_chain_append_cert(cert, ocsp, &sct_list, &chain) &&
+      sxg_cert_chain_append_cert(issuer, NULL, &sct_list, &chain) &&
+      sxg_write_cert_chain_cbor(&chain, dst);
+  sxg_cert_chain_release(&chain);
+  X509_free(cert);
+  X509_free(issuer);
+  return success;
 }

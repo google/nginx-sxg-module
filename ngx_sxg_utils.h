@@ -26,6 +26,7 @@
 #else
 #include "openssl/evp.h"
 #endif
+#include "libsxg.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,6 +50,10 @@ EVP_PKEY* load_private_key(const char* filepath);
 
 // Loads and create X509 struct from certs filepath.
 X509* load_x509_cert(const char* filepath);
+
+// Load and serialize Cert-Chain to `dst`.
+bool load_cert_chain(const char* cert_path, const char* key_path,
+                     sxg_buffer_t* dst);
 
 #ifdef __cplusplus
 }  // extern "C"
