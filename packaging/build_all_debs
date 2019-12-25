@@ -31,8 +31,8 @@ readonly DEB_DOCKER="packaging/dockerfiles/deb.dockerfile"
 
 declare -ar DISTROS=(
   debian:buster-slim
-  debian:stretch-slim
   ubuntu:disco
+  debian:stretch-slim
   ubuntu:bionic
 )
 

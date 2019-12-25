@@ -3,19 +3,17 @@ FROM ${base_image}
 
 LABEL maintainer "Hiroki Kumazaki <kumagi@google.com>"
 
-RUN mkdir /libsxg/build -p && \
-    cd /libsxg/build && \
-    cmake .. -DSKIP_TEST=true -DCMAKE_BUILD_TYPE=Release && \
-    make && \
-    make install
-    
+RUN /packaging/build_deb /libsxg; \
+    dpkg -i /packaging/output/libsxg0.2_0.2-1_amd64.deb; \
+    dpkg -i /packaging/output/libsxg-dev_0.2-1_amd64.deb || true
+
 RUN cat /etc/apt/sources.list \
     | grep "^deb " \
     | sed -e "s/^deb /deb-src /" \
     >> /etc/apt/sources.list
 RUN apt-get update && \
     apt-get install -y --no-install-recommends -q \
-    	            dpkg-dev && \
+                    dpkg-dev && \
     apt-get build-dep -y --no-install-recommends -q \
                       nginx-full
 
