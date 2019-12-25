@@ -59,6 +59,7 @@ static char* ngx_http_sxg_merge_srv_conf(ngx_conf_t* cf, void* parent,
 static char*
 ngx_conf_set_cert_chain(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
+
 static ngx_command_t ngx_http_sxg_commands[] = {
     {ngx_string("sxg"), NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_FLAG,
      ngx_conf_set_flag_slot, NGX_HTTP_SRV_CONF_OFFSET,
@@ -592,6 +593,26 @@ static bool append_header(ngx_list_t* headers,
   return true;
 }
 
+static bool update_cert_chain(ngx_http_sxg_srv_conf_t* conf) {
+  sxg_buffer_release(&conf->serialized_cert_chain);
+  return conf->cert_path.len == 0 ||
+      load_cert_chain((const char*)conf->certificate.data,
+                      (const char*)conf->certificate_key.data,
+                      &conf->serialized_cert_chain);
+}
+
+static void update_cert_chain_timestamp(ngx_http_sxg_srv_conf_t* conf) {
+  struct timeval time;
+  ngx_gettimeofday(&time);
+  conf->cert_chain_timestamp = time.tv_sec;
+}
+
+static int64_t seconds_from_last_timestamp(ngx_http_sxg_srv_conf_t* conf) {
+  struct timeval time;
+  ngx_gettimeofday(&time);
+  return time.tv_sec - conf->cert_chain_timestamp;
+}
+
 static ngx_int_t
 ngx_http_cert_chain_handler(ngx_http_request_t* req) {
   // Check the URL is certificate request.
@@ -599,6 +620,11 @@ ngx_http_cert_chain_handler(ngx_http_request_t* req) {
       ngx_http_get_module_srv_conf(req, ngx_http_sxg_filter_module);
   if (ssc->cert_path.len > 0 && req->uri.len == ssc->cert_path.len &&
       ngx_memcmp(req->uri.data, ssc->cert_path.data, req->uri.len) == 0) {
+    if (seconds_from_last_timestamp(ssc) > 60 * 60 * 24) {  // > 1day.
+      // Refresh OCSP response in Certificate-Chain.
+      update_cert_chain_timestamp(ssc);
+    }
+
     req->headers_out.status = NGX_HTTP_OK;
     req->headers_out.content_length_n = ssc->serialized_cert_chain.size;
 
@@ -666,15 +692,10 @@ ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
                               &nscf->signers)) {
       return NGX_ERROR;
     }
-    if (nscf->cert_path.len > 0 &&
-        !load_cert_chain((const char*)nscf->certificate.data,
-                         (const char*)nscf->certificate_key.data,
-                         &nscf->serialized_cert_chain)) {
+    if (!update_cert_chain(nscf)) {
       return NGX_ERROR;
     }
-    struct timeval time;
-    ngx_gettimeofday(&time);
-    nscf->cert_chain_timestamp = time.tv_sec;
+    update_cert_chain_timestamp(nscf);
     EVP_PKEY_free(privkey);
     X509_free(cert);
   }
