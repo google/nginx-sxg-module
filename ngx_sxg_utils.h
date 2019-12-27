@@ -72,7 +72,8 @@ bool load_cert_chain(const char* cert_path, ngx_sxg_cert_chain_t* target);
 // Loads and serialize Cert-Chain to `dst`.
 bool write_cert_chain(ngx_sxg_cert_chain_t* cert, sxg_buffer_t* dst);
 
-// Checks and refresh the OCSP response. Returns true if refresh required.
+// Checks and refreshes the OCSP response. Returns true if refresh done.
+// Returns false if refresh is not required.
 bool refresh_if_needed(ngx_sxg_cert_chain_t* target);
 
 #ifdef __cplusplus
