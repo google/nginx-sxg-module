@@ -16,12 +16,13 @@
 
 #include "ngx_sxg_utils.h"
 
-#include "testing/base/public/gmock.h"
-#include "testing/base/public/gunit.h"
+#include <string>
+
+#include "gtest/gtest.h"
 
 namespace {
 
-size_t TermLength(absl::string_view input) {
+size_t TermLength(const std::string& input) {
   return get_term_length(input.data(), input.size(), ',', "<>");
 }
 
@@ -32,7 +33,7 @@ TEST(NgxSxgUtilsTest, TermLength) {
   EXPECT_EQ(4, TermLength("<>12,a"));
 }
 
-bool ShouldBeSXG(absl::string_view input) {
+bool ShouldBeSXG(const std::string& input) {
   return highest_qvalue_is_sxg(input.data(), input.size());
 }
 
@@ -66,7 +67,7 @@ TEST(NgxSxgUtilsTest, ShouldBeSignedExchange) {
   EXPECT_FALSE(ShouldBeSXG("application/signed-exchange;v=b3321"));
 }
 
-bool ParamIsPreload(absl::string_view input) {
+bool ParamIsPreload(const std::string& input) {
   return param_is_preload(input.data(), input.size());
 }
 
