@@ -86,4 +86,22 @@ TEST(NgxSxgUtilsTest, ParamIsPreload) {
   EXPECT_FALSE(ParamIsPreload("rel=prepreload"));
 }
 
+TEST(NgxSxgCertChain, free) {
+  ngx_sxg_cert_chain_t c = ngx_sxg_empty_cert_chain();
+  ngx_sxg_cert_chain_release(&c);
+}
+
+TEST(NgxSxgCertChain, load) {
+  ngx_sxg_cert_chain_t c = ngx_sxg_empty_cert_chain();
+  EXPECT_TRUE(load_cert_chain("testdata/ocsp_included.pem", &c));
+  ngx_sxg_cert_chain_release(&c);
+}
+
+TEST(NgxSxgCertChain, ocsp) {
+  ngx_sxg_cert_chain_t c = ngx_sxg_empty_cert_chain();
+  ASSERT_TRUE(load_cert_chain("testdata/ocsp_included.pem", &c));
+  EXPECT_TRUE(refresh_if_needed(&c));
+  ngx_sxg_cert_chain_release(&c);
+}
+
 }  // namespace

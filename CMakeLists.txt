@@ -44,6 +44,9 @@ target_link_libraries(
 )
 
 enable_testing ()
+
+file (COPY testdata DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
 include (ExternalProject)
 ExternalProject_Add(
   googletest

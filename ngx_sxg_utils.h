@@ -23,8 +23,10 @@
 
 #ifdef __USE_THIRD_PARTY__
 #include "third_party/openssl/evp.h"
+#include "third_party/openssl/ocsp.h"
 #else
 #include "openssl/evp.h"
+#include "openssl/ocsp.h"
 #endif
 #include "libsxg.h"
 
@@ -32,7 +34,14 @@
 extern "C" {
 #endif
 
-// Get minimum length before delimiter, but delimiters quoted between quotes[0]
+typedef struct {
+  sxg_buffer_t serialized_cert_chain;
+  X509* certificate;
+  X509* issuer;
+  OCSP_RESPONSE* ocsp;
+} ngx_sxg_cert_chain_t;
+
+// Gets minimum length before delimiter, but delimiters quoted between quotes[0]
 // and quotes[1] will be ignored.
 size_t get_term_length(const char* str, size_t len, char delimiter,
                        const char quotes[2]);
@@ -51,9 +60,21 @@ EVP_PKEY* load_private_key(const char* filepath);
 // Loads and create X509 struct from certs filepath.
 X509* load_x509_cert(const char* filepath);
 
-// Load and serialize Cert-Chain to `dst`.
-bool load_cert_chain(const char* cert_path, const char* key_path,
-                     sxg_buffer_t* dst);
+// Returns empty ngx_sxg_cert_chain_t.
+ngx_sxg_cert_chain_t ngx_sxg_empty_cert_chain();
+
+// Relase ngx_sxg_empty_cert_chain_t.
+void ngx_sxg_cert_chain_release(ngx_sxg_cert_chain_t* target);
+
+// Loads certificates for Certificate-Chain type.
+bool load_cert_chain(const char* cert_path, ngx_sxg_cert_chain_t* target);
+
+// Loads and serialize Cert-Chain to `dst`.
+bool write_cert_chain(ngx_sxg_cert_chain_t* cert,
+                      sxg_buffer_t* dst);
+
+// Checks and refresh the OCSP response. Returns true if refresh required.
+bool refresh_if_needed(ngx_sxg_cert_chain_t* target);
 
 #ifdef __cplusplus
 }  // extern "C"
