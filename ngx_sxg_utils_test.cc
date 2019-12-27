@@ -93,14 +93,19 @@ TEST(NgxSxgCertChain, free) {
 
 TEST(NgxSxgCertChain, load) {
   ngx_sxg_cert_chain_t c = ngx_sxg_empty_cert_chain();
+
   EXPECT_TRUE(load_cert_chain("testdata/ocsp_included.pem", &c));
+
   ngx_sxg_cert_chain_release(&c);
 }
 
 TEST(NgxSxgCertChain, ocsp) {
   ngx_sxg_cert_chain_t c = ngx_sxg_empty_cert_chain();
   ASSERT_TRUE(load_cert_chain("testdata/ocsp_included.pem", &c));
+
   EXPECT_TRUE(refresh_if_needed(&c));
+  EXPECT_FALSE(refresh_if_needed(&c));  // The OCSP Response is already hot.
+
   ngx_sxg_cert_chain_release(&c);
 }
 
