@@ -1,4 +1,5 @@
 # NGINX SXG extension
+[![Build Status](https://travis-ci.org/google/nginx-sxg-module.svg?branch=master)](https://travis-ci.org/google/nginx-sxg-module)
 
 Signed HTTP Exchange(SXG) support for nginx. Nginx will convert response from
 upstream application into SXG, only for clients request on `Accept:
