@@ -92,7 +92,7 @@ static ngx_http_module_t ngx_http_sxg_filter_module_ctx = {
 
     ngx_http_sxg_create_srv_conf, /* create server configuration */
     ngx_http_sxg_merge_srv_conf,  /* merge server configuration */
-    
+
     ngx_http_sxg_create_srv_conf, /* create location configuration */
     ngx_http_sxg_merge_srv_conf,  /* merge location configuration */
 };
@@ -534,7 +534,7 @@ static ngx_int_t ngx_http_sxg_body_filter(ngx_http_request_t* req,
   if (!make_chain_from_buffer(req, &sxg, &out)) {
     return NGX_ERROR;
   }
-  
+
   ngx_log_error(NGX_LOG_NOTICE, req->connection->log, 0,
                 "Send sxg %l bytes, %d", sxg.size, req->header_sent);
 
@@ -620,7 +620,6 @@ ngx_http_cert_chain_handler(ngx_http_request_t* req) {
                     "Failed to return payload.");
       return NGX_ERROR;
     }
-    
     return NGX_DONE;
   }
   return NGX_OK;
@@ -670,7 +669,7 @@ ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
     if (nscf->cert_path.len > 0 &&
         !load_cert_chain((const char*)nscf->certificate.data,
                         &nscf->cert_chain)) {
-      return NGX_ERROR;      
+      return NGX_ERROR;
     }
 
     EVP_PKEY_free(privkey);

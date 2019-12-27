@@ -306,7 +306,7 @@ static bool check_refresh_needed(ngx_sxg_cert_chain_t* target) {
     OCSP_SINGLERESP* leaf = OCSP_resp_get0(br, i);
     int revocation_reason;
     ASN1_GENERALIZEDTIME *revocation_time;
-    ASN1_GENERALIZEDTIME *this_update;
+    ASN1_GENERALIZEDTIME *this_update; 
     ASN1_GENERALIZEDTIME *next_update;
             
     int status =
