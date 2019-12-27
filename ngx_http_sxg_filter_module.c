@@ -54,22 +54,22 @@ static char* ngx_http_sxg_merge_srv_conf(ngx_conf_t* cf, void* parent,
                                          void* child);
 
 static ngx_command_t ngx_http_sxg_commands[] = {
-    {ngx_string("sxg"), NGX_HTTP_SRV_CONF | NGX_CONF_FLAG,
+    {ngx_string("sxg"), NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_FLAG,
      ngx_conf_set_flag_slot, NGX_HTTP_SRV_CONF_OFFSET,
      offsetof(ngx_http_sxg_srv_conf_t, enable), NULL},
-    {ngx_string("sxg_max_payload"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+    {ngx_string("sxg_max_payload"), NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1,
      ngx_conf_set_size_slot, NGX_HTTP_SRV_CONF_OFFSET,
      offsetof(ngx_http_sxg_srv_conf_t, sxg_max_payload), NULL},
-    {ngx_string("sxg_certificate"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+    {ngx_string("sxg_certificate"), NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1,
      ngx_conf_set_str_slot, NGX_HTTP_SRV_CONF_OFFSET,
      offsetof(ngx_http_sxg_srv_conf_t, certificate), NULL},
-    {ngx_string("sxg_certificate_key"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+    {ngx_string("sxg_certificate_key"), NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1,
      ngx_conf_set_str_slot, NGX_HTTP_SRV_CONF_OFFSET,
      offsetof(ngx_http_sxg_srv_conf_t, certificate_key), NULL},
-    {ngx_string("sxg_cert_url"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+    {ngx_string("sxg_cert_url"), NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1,
      ngx_conf_set_str_slot, NGX_HTTP_SRV_CONF_OFFSET,
      offsetof(ngx_http_sxg_srv_conf_t, cert_url), NULL},
-    {ngx_string("sxg_validity_url"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+    {ngx_string("sxg_validity_url"), NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1,
      ngx_conf_set_str_slot, NGX_HTTP_SRV_CONF_OFFSET,
      offsetof(ngx_http_sxg_srv_conf_t, validity_url), NULL},
     ngx_null_command};
@@ -84,8 +84,8 @@ static ngx_http_module_t ngx_http_sxg_filter_module_ctx = {
     ngx_http_sxg_create_srv_conf, /* create server configuration */
     ngx_http_sxg_merge_srv_conf,  /* merge server configuration */
 
-    NULL, /* create location configuration */
-    NULL  /* merge location configuration */
+    ngx_http_sxg_create_srv_conf, /* create location configuration */
+    ngx_http_sxg_merge_srv_conf,  /* merge location configuration */
 };
 
 ngx_module_t ngx_http_sxg_filter_module = {
