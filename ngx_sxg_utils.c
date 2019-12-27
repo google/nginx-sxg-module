@@ -25,6 +25,7 @@
 #include "third_party/openssl/pem.h"
 #else
 #include "openssl/pem.h"
+#include "openssl/ocsp.h"
 #endif
 
 #include "libsxg.h"
@@ -235,28 +236,117 @@ X509* load_x509_cert(const char* filepath) {
   return cert;
 }
 
-bool load_cert_chain(const char* cert_path, const char* key_path,
-                     sxg_buffer_t* dst) {
-  EVP_PKEY* private_key = load_private_key(key_path);
+ngx_sxg_cert_chain_t ngx_sxg_empty_cert_chain() {
+  static ngx_sxg_cert_chain_t empty;
+  empty.serialized_cert_chain = sxg_empty_buffer();
+  empty.certificate = NULL;
+  empty.issuer = NULL;
+  empty.ocsp = NULL;
+  return empty;
+}
+
+void ngx_sxg_cert_chain_release(ngx_sxg_cert_chain_t* target) {
+  sxg_buffer_release(&target->serialized_cert_chain);
+  if (target->certificate != NULL) {
+    X509_free(target->certificate);
+  }
+  if (target->issuer != NULL) {
+    X509_free(target->issuer);
+  }
+}
+
+bool load_cert_chain(const char* cert_path, ngx_sxg_cert_chain_t* target) {
   FILE* certfile = fopen(cert_path, "r");
   if (!certfile) {
     return false;
   }
   char passwd = 0;
-  sxg_buffer_t sct_list = sxg_empty_buffer();
-  sxg_cert_chain_t chain = sxg_empty_cert_chain();
-  OCSP_RESPONSE* ocsp = NULL;
   X509* cert = PEM_read_X509(certfile, 0, 0, &passwd);
   X509* issuer = PEM_read_X509(certfile, 0, 0, &passwd);
   fclose(certfile);
+
+  target->certificate = cert;
+  target->issuer = issuer;
+  return (cert != NULL) && (issuer != NULL);
+}
+
+bool write_cert_chain(ngx_sxg_cert_chain_t* cert,
+                      sxg_buffer_t* dst) {
+  sxg_buffer_t sct_list = sxg_empty_buffer();
+  sxg_cert_chain_t chain = sxg_empty_cert_chain();
   bool success =
-      (cert != NULL) && (issuer != NULL) &&
-      sxg_fetch_ocsp_response(cert, issuer, &ocsp) &&
-      sxg_cert_chain_append_cert(cert, ocsp, &sct_list, &chain) &&
-      sxg_cert_chain_append_cert(issuer, NULL, &sct_list, &chain) &&
+      sxg_cert_chain_append_cert(cert->certificate, cert->ocsp,
+                                 &sct_list, &chain) &&
+      sxg_cert_chain_append_cert(cert->issuer, NULL, &sct_list, &chain) &&
       sxg_write_cert_chain_cbor(&chain, dst);
   sxg_cert_chain_release(&chain);
-  X509_free(cert);
-  X509_free(issuer);
   return success;
+}
+
+static bool asn1_generalizedtime_to_unixtime(const ASN1_GENERALIZEDTIME* ag,
+                                             time_t* out) {
+  if (ag->type != V_ASN1_GENERALIZEDTIME) {
+    return false;
+  }
+  struct tm t;
+  if (ASN1_TIME_to_tm(ag, &t) != 1) {
+    return false;
+  }
+  *out = mktime(&t);
+  return true;
+}
+
+static bool check_refresh_needed(ngx_sxg_cert_chain_t* target) {
+  if (target->ocsp == NULL) {
+    return true;
+  }
+  OCSP_BASICRESP* br = OCSP_response_get1_basic(target->ocsp);
+  const int resps = OCSP_resp_count(br);
+  for (int i = 0; i < resps; ++i) {
+    OCSP_SINGLERESP* leaf = OCSP_resp_get0(br, i);
+    int revocation_reason;
+    ASN1_GENERALIZEDTIME *revocation_time;
+    ASN1_GENERALIZEDTIME *this_update;
+    ASN1_GENERALIZEDTIME *next_update;
+            
+    int status =
+        OCSP_single_get0_status(leaf, &revocation_reason, &revocation_time,
+                                &this_update, &next_update);
+    if (status == -1) {
+      return true;
+    }
+    
+    time_t since;
+    time_t until;
+    time_t update;
+    if (!asn1_generalizedtime_to_unixtime(this_update, &since) ||
+        !asn1_generalizedtime_to_unixtime(next_update, &until)) {
+      return true;
+    }
+
+    // NextUpdate field is optional.
+    bool next_update_exists =
+        asn1_generalizedtime_to_unixtime(revocation_time, &update);
+
+    time_t middle_lifespan = ((uint64_t)since + until) / 2;
+    const time_t now = time(NULL);
+
+    if (middle_lifespan < now || (next_update_exists && update < now)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool refresh_if_needed(ngx_sxg_cert_chain_t* target) {
+  if (!check_refresh_needed(target)) {
+    return false;
+  }
+  if (target->ocsp != NULL) {
+    OCSP_RESPONSE_free(target->ocsp);
+  }
+  return sxg_fetch_ocsp_response(target->certificate,
+                                 target->issuer,
+                                 &target->ocsp) &&
+         write_cert_chain(target, &target->serialized_cert_chain);
 }

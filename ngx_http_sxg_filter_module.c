@@ -37,8 +37,7 @@ typedef struct {
   ngx_str_t validity_url;
   ngx_str_t cert_path;
   sxg_signer_list_t signers;
-  sxg_buffer_t serialized_cert_chain;
-  time_t cert_chain_timestamp;
+  ngx_sxg_cert_chain_t cert_chain;
 } ngx_http_sxg_srv_conf_t;
 
 typedef struct {
@@ -133,7 +132,7 @@ static void* ngx_http_sxg_create_srv_conf(ngx_conf_t* cf) {
   ssc->cert_url = (ngx_str_t) {.data = NULL, .len = 0 };
   ssc->validity_url = (ngx_str_t) {.data = NULL, .len = 0 };
   ssc->cert_path = (ngx_str_t) {.data = NULL, .len = 0 };
-  ssc->serialized_cert_chain = (sxg_buffer_t) {.data = NULL, .size = 0, .capacity = 0 };
+  ssc->cert_chain = ngx_sxg_empty_cert_chain();
   ssc->signers = sxg_empty_signer_list();
   return ssc;
 }
@@ -482,10 +481,6 @@ static ngx_int_t ngx_http_sxg_body_filter(ngx_http_request_t* req,
   if (ctx == NULL || req->done || req->header_sent) {
     return ngx_http_next_body_filter(req, in);
   }
-  if (ctx->cert_chain_mode) {
-    ngx_log_error(NGX_LOG_NOTICE, req->connection->log, 0,
-                  "body for cert request %z", ssc->serialized_cert_chain.size);
-  }
 
   if (!ctx->main_resource_loaded) {
     bool lastbuf_included = false;
@@ -593,26 +588,6 @@ static bool append_header(ngx_list_t* headers,
   return true;
 }
 
-static bool update_cert_chain(ngx_http_sxg_srv_conf_t* conf) {
-  sxg_buffer_release(&conf->serialized_cert_chain);
-  return conf->cert_path.len == 0 ||
-      load_cert_chain((const char*)conf->certificate.data,
-                      (const char*)conf->certificate_key.data,
-                      &conf->serialized_cert_chain);
-}
-
-static void update_cert_chain_timestamp(ngx_http_sxg_srv_conf_t* conf) {
-  struct timeval time;
-  ngx_gettimeofday(&time);
-  conf->cert_chain_timestamp = time.tv_sec;
-}
-
-static int64_t seconds_from_last_timestamp(ngx_http_sxg_srv_conf_t* conf) {
-  struct timeval time;
-  ngx_gettimeofday(&time);
-  return time.tv_sec - conf->cert_chain_timestamp;
-}
-
 static ngx_int_t
 ngx_http_cert_chain_handler(ngx_http_request_t* req) {
   // Check the URL is certificate request.
@@ -620,13 +595,13 @@ ngx_http_cert_chain_handler(ngx_http_request_t* req) {
       ngx_http_get_module_srv_conf(req, ngx_http_sxg_filter_module);
   if (ssc->cert_path.len > 0 && req->uri.len == ssc->cert_path.len &&
       ngx_memcmp(req->uri.data, ssc->cert_path.data, req->uri.len) == 0) {
-    if (seconds_from_last_timestamp(ssc) > 60 * 60 * 24) {  // > 1day.
-      // Refresh OCSP response in Certificate-Chain.
-      update_cert_chain_timestamp(ssc);
+    bool refreshed = refresh_if_needed(&ssc->cert_chain);
+    if (refreshed) {
+      ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
+                    "OCSP Response in Certificate-Chain is refreshed.");
     }
-
     req->headers_out.status = NGX_HTTP_OK;
-    req->headers_out.content_length_n = ssc->serialized_cert_chain.size;
+    req->headers_out.content_length_n = ssc->cert_chain.serialized_cert_chain.size;
 
     if (!append_header(&req->headers_out.headers,
                        "Content-Type", "application/cert-chain+cbor")) {
@@ -634,7 +609,7 @@ ngx_http_cert_chain_handler(ngx_http_request_t* req) {
     }
 
     ngx_chain_t* out;
-    if (!make_chain_from_buffer(req, &ssc->serialized_cert_chain, &out)) {
+    if (!make_chain_from_buffer(req, &ssc->cert_chain.serialized_cert_chain, &out)) {
       ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
                     "Failed to generate Cert-Chain.");
       return NGX_ERROR;
@@ -692,10 +667,12 @@ ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
                               &nscf->signers)) {
       return NGX_ERROR;
     }
-    if (!update_cert_chain(nscf)) {
-      return NGX_ERROR;
+    if (nscf->cert_path.len > 0 &&
+        !load_cert_chain((const char*)nscf->certificate.data,
+                        &nscf->cert_chain)) {
+      return NGX_ERROR;      
     }
-    update_cert_chain_timestamp(nscf);
+
     EVP_PKEY_free(privkey);
     X509_free(cert);
   }
