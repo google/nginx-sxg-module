@@ -112,6 +112,7 @@ ngx_module_t ngx_http_sxg_filter_module = {
     NGX_MODULE_V1_PADDING            /* padding */
 };
 
+static
 char* str_to_null_terminated(ngx_pool_t* pool, const ngx_str_t* str) {
   char* copied = ngx_palloc(pool, str->len + 1);
   if (copied == NULL) {
@@ -547,6 +548,7 @@ static ngx_int_t ngx_http_sxg_body_filter(ngx_http_request_t* req,
   return ngx_http_next_body_filter(req, out);
 }
 
+static
 bool is_valid_config(ngx_conf_t* nc, const ngx_http_sxg_srv_conf_t* sc) {
   bool valid = true;
   if (sc->certificate.len == 0) {
@@ -572,9 +574,8 @@ bool is_valid_config(ngx_conf_t* nc, const ngx_http_sxg_srv_conf_t* sc) {
   return valid;
 }
 
-static bool append_header(ngx_list_t* headers,
-                          const char* key,
-                          const char* value) {
+static
+bool append_header(ngx_list_t* headers, const char* key, const char* value) {
   ngx_table_elt_t* h = ngx_list_push(headers);
   if (h == NULL) {
     return false;
@@ -588,8 +589,7 @@ static bool append_header(ngx_list_t* headers,
   return true;
 }
 
-static ngx_int_t
-ngx_http_cert_chain_handler(ngx_http_request_t* req) {
+static ngx_int_t ngx_http_cert_chain_handler(ngx_http_request_t* req) {
   // Check the URL is certificate request.
   ngx_http_sxg_srv_conf_t* ssc =
       ngx_http_get_module_srv_conf(req, ngx_http_sxg_filter_module);
@@ -625,8 +625,8 @@ ngx_http_cert_chain_handler(ngx_http_request_t* req) {
   return NGX_OK;
 }
 
-static char*
-ngx_conf_set_cert_chain(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+static
+char* ngx_conf_set_cert_chain(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
   ngx_http_sxg_srv_conf_t* ssc = conf;
   ngx_str_t* args = cf->args->elts;
   if (ssc->cert_path.data != NULL) {
@@ -636,6 +636,7 @@ ngx_conf_set_cert_chain(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
   return NGX_CONF_OK;
 }
 
+static
 ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
   ngx_http_core_main_conf_t* cmcf =
       ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
