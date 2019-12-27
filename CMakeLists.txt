@@ -24,7 +24,6 @@ set (CMAKE_PROJECT_VERSION_PATCH "0")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -std=c++11 -fPIC -g -ggdb")
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -std=c99 -fPIC -g -ggdb")
 
-include (ExternalProject)
 set_property(
   DIRECTORY ${PROJECT_SOURCE_DIR}
   PROPERTY EP_UPDATE_DISCONNECTED 1
@@ -37,43 +36,49 @@ add_library(
   SHARED
     ngx_sxg_utils.c
 )
-
 target_link_libraries(
   ngx_sxg_utils
   PRIVATE
+    sxg
     ${OPENSSL_LIBRARIES}
 )
 
 enable_testing ()
-
+include (ExternalProject)
 ExternalProject_Add(
-  gtest
+  googletest
   GIT_REPOSITORY https://github.com/google/googletest
   GIT_TAG master
   SOURCE_DIR ${PROJECT_BINARY_DIR}/third_party/gtest
   BINARY_DIR ${PROJECT_BINARY_DIR}/gtest
   INSTALL_COMMAND ""
 )
-add_library (libgtest IMPORTED STATIC GLOBAL)
-add_dependencies (libgtest gtest)
+
+add_library (gtest IMPORTED STATIC GLOBAL)
+add_dependencies (gtest googletest)
+set (GTEST_INCLUDE_DIR "${PROJECT_BINARY_DIR}/third_party/gtest/googletest/include")
+file (MAKE_DIRECTORY "${GTEST_INCLUDE_DIR}")
+
 set_target_properties(
-  libgtest PROPERTIES
-    "IMPORTED_LOCATION" "${PROJECT_BINARY_DIR}/gtest/lib/libgtest.a"
-    "IMPORTED_LINK_INTERFACE_LIBRARIES" "${CMAKE_THREAD_LIBS_INIT}"
+  gtest PROPERTIES
+    IMPORTED_LOCATION "${PROJECT_BINARY_DIR}/gtest/lib/libgtest.a"
+    IMPORTED_LINK_INTERFACE_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}"
+    INTERFACE_INCLUDE_DIRECTORIES "${GTEST_INCLUDE_DIR}"
 )
+
 add_library (libgtest_main IMPORTED STATIC GLOBAL)
 add_dependencies (libgtest_main gtest)
 set_target_properties(
   libgtest_main PROPERTIES
-    "IMPORTED_LOCATION" "${PROJECT_BINARY_DIR}/gtest/lib/libgtest_main.a"
-    "IMPORTED_LINK_INTERFACE_LIBRARIES" "${CMAKE_THREAD_LIBS_INIT}"
+    IMPORTED_LOCATION "${PROJECT_BINARY_DIR}/gtest/lib/libgtest_main.a"
+    IMPORTED_LINK_INTERFACE_LIBRARIES "${CMAKE_THREAD_LIBS_INIT}"
 )
-target_include_directories(
-  libgtest
+target_link_libraries(
+  gtest
   INTERFACE
-    ${PROJECT_BINARY_DIR}/third_party/gtest/googletest/include
+    pthread
+    libgtest_main
 )
-set (GTEST_INCLUDE ${PROJECT_BINARY_DIR}/third_party/gtest/googletest/include)
 
 macro (add_test_macro target_name test_name)
   add_executable (${target_name} ${test_name}.cc)
@@ -81,21 +86,12 @@ macro (add_test_macro target_name test_name)
     NAME ${target_name}
     COMMAND ${target_name}
   )
-  add_dependencies (${target_name} libgtest libgtest_main gtest ngx_sxg_utils)
+  add_dependencies (${target_name} gtest ngx_sxg_utils)
   target_link_libraries (
     ${target_name}
     PRIVATE
-      sxg
-      libgtest
-      libgtest_main
-      pthread
+      gtest
       ngx_sxg_utils
-      ${OPENSSL_LIBRARIES}
-  )
-  target_include_directories(
-    ${target_name}
-    PRIVATE
-      ${GTEST_INCLUDE}
   )
 endmacro ()
 
