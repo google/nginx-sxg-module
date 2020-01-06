@@ -58,7 +58,6 @@ static char* ngx_http_sxg_merge_srv_conf(ngx_conf_t* cf, void* parent,
 static char*
 ngx_conf_set_cert_chain(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 
-
 static ngx_command_t ngx_http_sxg_commands[] = {
     {ngx_string("sxg"), NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_FLAG,
      ngx_conf_set_flag_slot, NGX_HTTP_SRV_CONF_OFFSET,
@@ -359,7 +358,7 @@ static bool invoke_subrequests(ngx_str_t* link, ngx_http_request_t* req,
 }
 
 static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
-  // Called on every HTTP requests.
+  // Called on every HTTP request.
   ngx_http_sxg_srv_conf_t* ssc =
       ngx_http_get_module_srv_conf(req, ngx_http_sxg_filter_module);
   if (!ssc->enable) {
@@ -590,39 +589,40 @@ bool append_header(ngx_list_t* headers, const char* key, const char* value) {
 }
 
 static ngx_int_t ngx_http_cert_chain_handler(ngx_http_request_t* req) {
-  // Check the URL is certificate request.
+  // Check the URL is a certificate request.
   ngx_http_sxg_srv_conf_t* ssc =
       ngx_http_get_module_srv_conf(req, ngx_http_sxg_filter_module);
-  if (ssc->cert_path.len > 0 && req->uri.len == ssc->cert_path.len &&
-      ngx_memcmp(req->uri.data, ssc->cert_path.data, req->uri.len) == 0) {
-    bool refreshed = refresh_if_needed(&ssc->cert_chain);
-    if (refreshed) {
-      ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                    "OCSP Response in Certificate-Chain is refreshed.");
-    }
-    req->headers_out.status = NGX_HTTP_OK;
-    req->headers_out.content_length_n = ssc->cert_chain.serialized_cert_chain.size;
-
-    if (!append_header(&req->headers_out.headers,
-                       "Content-Type", "application/cert-chain+cbor")) {
-      return NGX_HTTP_INTERNAL_SERVER_ERROR;
-    }
-
-    ngx_chain_t* out;
-    if (!make_chain_from_buffer(req, &ssc->cert_chain.serialized_cert_chain, &out)) {
-      ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                    "Failed to generate Cert-Chain.");
-      return NGX_ERROR;
-    }
-    if (ngx_http_next_header_filter(req) != NGX_OK ||
-        ngx_http_next_body_filter(req, out) != NGX_OK) {
-      ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                    "Failed to return payload.");
-      return NGX_ERROR;
-    }
-    return NGX_DONE;
+  if (ssc->cert_path.len <= 0 ||
+      req->uri.len != ssc->cert_path.len ||
+      ngx_memcmp(req->uri.data, ssc->cert_path.data, req->uri.len) != 0) {
+    return NGX_OK;
   }
-  return NGX_OK;
+  bool refreshed = refresh_if_needed(&ssc->cert_chain);
+  if (refreshed) {
+    ngx_log_error(NGX_LOG_INFO, req->connection->log, 0,
+                  "OCSP Response in Certificate-Chain is refreshed.");
+  }
+  req->headers_out.status = NGX_HTTP_OK;
+  req->headers_out.content_length_n = ssc->cert_chain.serialized_cert_chain.size;
+  
+  if (!append_header(&req->headers_out.headers,
+                     "Content-Type", "application/cert-chain+cbor")) {
+    return NGX_HTTP_INTERNAL_SERVER_ERROR;
+  }
+  
+  ngx_chain_t* out;
+  if (!make_chain_from_buffer(req, &ssc->cert_chain.serialized_cert_chain, &out)) {
+    ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
+                  "Failed to generate Cert-Chain.");
+    return NGX_ERROR;
+  }
+  if (ngx_http_next_header_filter(req) != NGX_OK ||
+      ngx_http_next_body_filter(req, out) != NGX_OK) {
+    ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
+                  "Failed to return payload.");
+    return NGX_ERROR;
+  }
+  return NGX_DONE;
 }
 
 static

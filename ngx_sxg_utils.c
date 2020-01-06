@@ -23,6 +23,7 @@
 
 #ifdef __USE_THIRD_PARTY__
 #include "third_party/openssl/pem.h"
+#include "third_party/openssl/ocsp.h"
 #else
 #include "openssl/pem.h"
 #include "openssl/ocsp.h"
@@ -249,9 +250,11 @@ void ngx_sxg_cert_chain_release(ngx_sxg_cert_chain_t* target) {
   sxg_buffer_release(&target->serialized_cert_chain);
   if (target->certificate != NULL) {
     X509_free(target->certificate);
+    target->certificate = NULL;
   }
   if (target->issuer != NULL) {
     X509_free(target->issuer);
+    target->issuer = NULL;
   }
 }
 
@@ -267,17 +270,17 @@ bool load_cert_chain(const char* cert_path, ngx_sxg_cert_chain_t* target) {
 
   target->certificate = cert;
   target->issuer = issuer;
-  return (cert != NULL) && (issuer != NULL);
+  return cert != NULL && issuer != NULL;
 }
 
 bool write_cert_chain(ngx_sxg_cert_chain_t* cert,
                       sxg_buffer_t* dst) {
-  sxg_buffer_t sct_list = sxg_empty_buffer();
+  sxg_buffer_t empty_sct_list = sxg_empty_buffer();
   sxg_cert_chain_t chain = sxg_empty_cert_chain();
   bool success =
       sxg_cert_chain_append_cert(cert->certificate, cert->ocsp,
-                                 &sct_list, &chain) &&
-      sxg_cert_chain_append_cert(cert->issuer, NULL, &sct_list, &chain) &&
+                                 &empty_sct_list, &chain) &&
+      sxg_cert_chain_append_cert(cert->issuer, NULL, &empty_sct_list, &chain) &&
       sxg_write_cert_chain_cbor(&chain, dst);
   sxg_cert_chain_release(&chain);
   return success;
@@ -328,7 +331,10 @@ static bool check_refresh_needed(ngx_sxg_cert_chain_t* target) {
     bool next_update_exists =
         asn1_generalizedtime_to_unixtime(revocation_time, &update);
 
-    time_t middle_lifespan = ((uint64_t)since + until) / 2;
+    if (since < until) {
+      return false;
+    }
+    time_t middle_lifespan = since + ((until - since) / 2);
     const time_t now = time(NULL);
 
     if (middle_lifespan < now || (next_update_exists && update < now)) {
