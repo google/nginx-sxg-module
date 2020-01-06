@@ -369,9 +369,9 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
       ngx_memcmp(req->uri.data, ssc->cert_path.data, req->uri.len) == 0) {
     int rc = ngx_http_send_header(req);
     if (rc == NGX_ERROR || rc > NGX_OK || req->header_only) {
-        return rc;
+      return rc;
     }
-    return NGX_ERROR;
+    return NGX_OK;
   }
 
   if (!ssc->enable || !response_should_be_sxg(req) || req->header_only ||
@@ -459,6 +459,7 @@ static bool make_chain_from_buffer(ngx_http_request_t* req,
   if (b == NULL || copied_buffer == NULL || out == NULL) {
     ngx_pfree(req->pool, b);
     ngx_pfree(req->pool, copied_buffer);
+    ngx_pfree(req->pool, out);
     return false;
   }
   ngx_memcpy(copied_buffer, src->data, src->size);
