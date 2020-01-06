@@ -43,6 +43,12 @@ target_link_libraries(
     ${OPENSSL_LIBRARIES}
 )
 
+# This target requires cmake-format executable in your path.
+add_custom_target (
+  cmake_format
+  COMMAND cmake-format -i ${CMAKE_SOURCE_DIR}/CMakeLists.txt
+  COMMENT "Formating with cmake-format ...")
+
 enable_testing ()
 
 file (COPY testdata DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
