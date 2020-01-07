@@ -22,11 +22,11 @@
 #include <strings.h>
 
 #ifdef __USE_THIRD_PARTY__
-#include "third_party/openssl/pem.h"
 #include "third_party/openssl/ocsp.h"
+#include "third_party/openssl/pem.h"
 #else
-#include "openssl/pem.h"
 #include "openssl/ocsp.h"
+#include "openssl/pem.h"
 #endif
 
 #include "libsxg.h"
@@ -273,13 +273,12 @@ bool load_cert_chain(const char* cert_path, ngx_sxg_cert_chain_t* target) {
   return cert != NULL && issuer != NULL;
 }
 
-bool write_cert_chain(ngx_sxg_cert_chain_t* cert,
-                      sxg_buffer_t* dst) {
+bool write_cert_chain(ngx_sxg_cert_chain_t* cert, sxg_buffer_t* dst) {
   sxg_buffer_t empty_sct_list = sxg_empty_buffer();
   sxg_cert_chain_t chain = sxg_empty_cert_chain();
   bool success =
-      sxg_cert_chain_append_cert(cert->certificate, cert->ocsp,
-                                 &empty_sct_list, &chain) &&
+      sxg_cert_chain_append_cert(cert->certificate, cert->ocsp, &empty_sct_list,
+                                 &chain) &&
       sxg_cert_chain_append_cert(cert->issuer, NULL, &empty_sct_list, &chain) &&
       sxg_write_cert_chain_cbor(&chain, dst);
   sxg_cert_chain_release(&chain);
@@ -308,17 +307,16 @@ static bool check_refresh_needed(ngx_sxg_cert_chain_t* target) {
   for (int i = 0; i < resps; ++i) {
     OCSP_SINGLERESP* leaf = OCSP_resp_get0(br, i);
     int revocation_reason;
-    ASN1_GENERALIZEDTIME *revocation_time;
-    ASN1_GENERALIZEDTIME *this_update; 
-    ASN1_GENERALIZEDTIME *next_update;
-            
-    int status =
-        OCSP_single_get0_status(leaf, &revocation_reason, &revocation_time,
-                                &this_update, &next_update);
+    ASN1_GENERALIZEDTIME* revocation_time;
+    ASN1_GENERALIZEDTIME* this_update;
+    ASN1_GENERALIZEDTIME* next_update;
+
+    int status = OCSP_single_get0_status(
+        leaf, &revocation_reason, &revocation_time, &this_update, &next_update);
     if (status == -1) {
       return true;
     }
-    
+
     time_t since;
     time_t until;
     time_t update;
@@ -351,8 +349,7 @@ bool refresh_if_needed(ngx_sxg_cert_chain_t* target) {
   if (target->ocsp != NULL) {
     OCSP_RESPONSE_free(target->ocsp);
   }
-  return sxg_fetch_ocsp_response(target->certificate,
-                                 target->issuer,
+  return sxg_fetch_ocsp_response(target->certificate, target->issuer,
                                  &target->ocsp) &&
          write_cert_chain(target, &target->serialized_cert_chain);
 }
