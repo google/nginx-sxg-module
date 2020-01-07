@@ -1,0 +1,7 @@
+# usage:
+# $ cmake-format -i CMakeLists.txt
+first_comment_is_literal: true
+separate_ctrl_name_with_space: true
+separate_fn_name_with_space: true
+enable_sort: true
+autosort: true
