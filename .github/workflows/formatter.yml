@@ -1,9 +1,0 @@
-on: push
-name: Code Format Checker
-jobs:
-  lint:
-    name: Code Format Checker
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checker
-      uses: kumagi/clang-format-action@clang9-check-diff
