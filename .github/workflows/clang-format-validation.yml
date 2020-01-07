@@ -1,0 +1,21 @@
+name: Validate code format with clang-format
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-18.04
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Install clang-format
+      run: |
+        # https://apt.llvm.org/llvm.sh
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+        sudo add-apt-repository 'deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-9 main'
+        sudo apt-get update
+        sudo apt-get install -y clang-format-9
+
+    - name: Check diff
+      run: |
+        git ls-files *.{c,h,hpp,cpp,cc} | xargs clang-format-9 -style=file -i
+        git diff --exit-code
+
