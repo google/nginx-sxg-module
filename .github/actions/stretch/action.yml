@@ -1,0 +1,7 @@
+name: 'Release stretch'
+descrioption: 'Build and release nginx-module for Ubuntu stretch'
+author: 'kumagi'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'

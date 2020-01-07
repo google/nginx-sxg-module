@@ -1,0 +1,7 @@
+name: 'Release {{ name }}'
+descrioption: 'Build and release nginx-module for Ubuntu {{ name }}'
+author: 'kumagi'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'

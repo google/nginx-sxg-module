@@ -1,0 +1,36 @@
+name: 'Release .deb files'
+on: push
+
+jobs:
+  build-for-bionic:
+    runs-on: ubuntu-latest
+    name: Build deb for bionic
+    steps:
+      - uses: actions/checkout@v1
+      - uses: ./.github/actions/bionic
+      - uses: actions/upload-artifact@v1
+        with:
+          name: bionic-package
+          path: libnginx-mod-http-sxg-filter_1.14.0-0ubuntu1.6_amd64.deb
+
+  build-for-eoan:
+    runs-on: ubuntu-latest
+    name: Build deb for eoan
+    steps:
+      - uses: actions/checkout@v1
+      - uses: ./.github/actions/eoan
+      - uses: actions/upload-artifact@v1
+        with:
+          name: eoan-package
+          path: libnginx-mod-http-sxg-filter_1.16.1-0ubuntu2_amd64.deb
+
+  build-for-buster:
+    runs-on: ubuntu-latest
+    name: Build deb for buster
+    steps:
+      - uses: actions/checkout@v1
+      - uses: ./.github/actions/buster
+      - uses: actions/upload-artifact@v1
+        with:
+          name: buster-package
+          path: libnginx-mod-http-sxg-filter_1.14.2-2+deb10u1_amd64.deb

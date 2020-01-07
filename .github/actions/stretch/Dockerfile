@@ -1,5 +1,4 @@
-ARG base_image
-FROM ${base_image}
+FROM debian:stretch
 
 LABEL maintainer "Hiroki Kumazaki <kumagi@google.com>"
 
@@ -8,18 +7,18 @@ RUN grep -q "# deb-src" /etc/apt/sources.list && sed -Ei 's/^# deb-src /deb-src 
     apt-get update && \
     apt-get install -y --no-install-recommends -q \
                     build-essential \
-		    ca-certificates \
+                    ca-certificates \
                     cmake \
                     debhelper \
                     devscripts \
-		    dpkg-dev \
+                    dpkg-dev \
                     fakeroot \
                     git \
                     libssl-dev \
                     lsb-release \
-		    pbuilder && \
+                    pbuilder && \
     apt-get build-dep -y --no-install-recommends -q \
-    	    nginx-full && \
+            nginx-full && \
     rm -rf /var/lib/apt/lists/*
 
 RUN git clone -b debian http://github.com/google/libsxg.git /libsxg && \
@@ -33,4 +32,4 @@ RUN git clone -b debian http://github.com/google/libsxg.git /libsxg && \
 ADD . /nginx-sxg-module
 WORKDIR /nginx-sxg-module
 
-CMD ["packaging/build_deb", "docker_output"]
+CMD ["packaging/build_deb", "./"]
