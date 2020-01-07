@@ -1,0 +1,15 @@
+name: 'Release .deb files'
+description: 'Build multiple .deb files with docker'
+on: [push]  # It should become only for pushing on master
+author: 'kumagi'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: RUn build-tools to build docker with argument
+        with:
+          dockerfile: 'packaging/dockerfiles/deb.dockerfile'
+          docker-build-args: '--build-arg base_image=debian:buster'
