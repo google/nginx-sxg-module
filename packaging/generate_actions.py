@@ -1,4 +1,3 @@
-import jinja2
 import pathlib
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -9,30 +8,30 @@ def main():
   images = [
     {
         "name": "bionic",
-        "base_name": "ubuntu:bionic"
+        "image_name": "ubuntu:bionic"
     },
     {
         "name": "eoan",
-        "base_name": "ubuntu:eoan"
+        "image_name": "ubuntu:eoan"
     },
     {
         "name": "stretch",
-        "base_name": "debian:stretch"
+        "image_name": "debian:stretch"
     },
     {
         "name": "buster",
-        "base_name": "debian:buster"
+        "image_name": "debian:buster"
     },
   ]
-  env = jinja2.Environment(
-      loader=jinja2.FileSystemLoader(TEMPLATE_PATH.as_posix()))
-  docker_template = env.get_template("Dockerfile.jinja")
-  action_template = env.get_template("action.jinja.yml")
+  with open(TEMPLATE_PATH.joinpath("template.dockerfile"), 'r') as f:
+    docker_template = f.read()
+  with open(TEMPLATE_PATH.joinpath("template.yml"), 'r') as f:
+    action_template = f.read()
   for image in images:
     with open(DST_PATH.joinpath(image["name"], "Dockerfile"), "w") as f:
-      f.write(docker_template.render(base_image=image["base_name"]))
+      f.write(docker_template.format(base_image=image["image_name"]))
     with open(DST_PATH.joinpath(image["name"], "action.yml"), "w") as f:
-      f.write(action_template.render(name=image["name"]))
+      f.write(action_template.format(target=image["name"]))
 
 if __name__ == "__main__":
   main()

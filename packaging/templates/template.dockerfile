@@ -1,4 +1,4 @@
-FROM {{ base_image }}
+FROM {base_image}
 
 LABEL maintainer "Hiroki Kumazaki <kumagi@google.com>"
 
