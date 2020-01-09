@@ -25,7 +25,7 @@ RUN apt-get update && \
 RUN git clone -b debian http://github.com/google/libsxg.git /libsxg && \
     cd /libsxg && \
     sed -i -e "s/^debuild/debuild -uc -us/" \
-           -e "s/^lintian.*$/d" build_deb && \
+           -e "/^lintia/nd" build_deb && \
     ./build_deb http://github.com/google/libsxg && \
     dpkg -i output/libsxg0.2_0.2-1_amd64.deb && \
             output/libsxg-dev_0.2-1_amd64.deb
