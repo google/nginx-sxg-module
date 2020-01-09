@@ -35,6 +35,9 @@ cd nginx-*
 sed -i \
   -e "s|^common_configure_flags := |common_configure_flags := --add-dynamic-module=${SRCDIR} |g" \
   -e "s/^DYN_MODS := /DYN_MODS := http-sxg-filter /g" debian/rules
+sed -i \
+  -e "s/libssl-dev,/libssl-dev, libsxg-dev,/" \
+  -e "s/Maintainer: .*$/Maintainer: Hiroki Kumazaki <kumagi@google.com>/" debian/control
 
 # The empty line separates the description from previous one already in
 # debian/control.
@@ -42,7 +45,7 @@ cat << 'EOF' >> debian/control
 
 Package: libnginx-mod-http-sxg-filter
 Architecture: any
-Depends: libsxg0.2 (>= 0.2),
+Depends: libsxg0 (>= 0),
          ${misc:Depends},
          ${shlibs:Depends}
 Description: Signed HTTP Exchange filter module for nginx.
@@ -59,5 +62,6 @@ debuild -us -uc
 mv ../libnginx-mod-http-sxg-filter_*.deb "${DESTDIR}"
 cd ../..
 rm -rf "${WORKDIR}"
+dpkg -I ${DESTDIR}/libnginx-mod-http-sxg-filter_*.deb
 
 echo "Successfully generated .deb file"

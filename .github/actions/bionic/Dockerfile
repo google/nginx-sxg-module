@@ -4,9 +4,6 @@ FROM ubuntu:bionic
 
 LABEL maintainer "Hiroki Kumazaki <kumagi@google.com>"
 
-RUN grep -q "# deb-src" /etc/apt/sources.list && sed -Ei 's/^# deb-src /deb-src /' /etc/apt/sources.list || \
-    cat /etc/apt/sources.list | grep "^deb " | sed -e "s/^deb /deb-src /" | tee -a /etc/apt/sources.list
-    
 RUN apt-get update && \
     apt-get install -y --no-install-recommends -q \
                     build-essential \
@@ -19,18 +16,20 @@ RUN apt-get update && \
                     git \
                     libssl-dev \
                     lsb-release \
-                    pbuilder && \
-    apt-get build-dep -y --no-install-recommends -q \
-            nginx-full && \
-    rm -rf /var/lib/apt/lists/*
+		    moreutils \
+                    wget
 
-RUN git clone -b debian http://github.com/google/libsxg.git /libsxg && \
-    cd /libsxg && \
-    sed -i -e "s/^debuild/debuild -uc -us/" \
-           -e "/^lintian/d" build_deb && \
-    ./build_deb http://github.com/google/libsxg && \
-    dpkg -i output/libsxg0.2_0.2-1_amd64.deb \
-            output/libsxg-dev_0.2-1_amd64.deb
+RUN grep -q "# deb-src" /etc/apt/sources.list && sed -i -e 's/^# deb-src /deb-src /' /etc/apt/sources.list || \
+    sed -e "s/^deb /deb-src /" < /etc/apt/sources.list | grep "^deb-src" | sponge -a /etc/apt/sources.list
+
+RUN cat /etc/apt/sources.list
+RUN apt-get update && apt-get build-dep -y -q nginx-full
+
+
+RUN wget https://github.com/google/libsxg/releases/download/v0.2/libsxg0_0.2-1_amd64.deb && \
+    wget https://github.com/google/libsxg/releases/download/v0.2/libsxg-dev_0.2-1_amd64.deb && \
+    dpkg -i libsxg0_0.2-1_amd64.deb && \
+    dpkg -i libsxg-dev_0.2-1_amd64.deb
 
 ADD . /nginx-sxg-module
 WORKDIR /nginx-sxg-module

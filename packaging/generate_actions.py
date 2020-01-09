@@ -8,7 +8,7 @@ def generate():
   """
   Generate Github action files for generating .deb files for various debian based environments.
   We wanted to use --build-args to switch the base environments of dockerfiles, but `build-args` are not supported by Github actions. https://github.community/t5/GitHub-Actions/Feature-Request-Build-args-support-in-Docker-container-actions/td-p/37802
-  We planed to migrate it to use build-args feature after Github support it.
+  We plan to migrate it to use build-args feature after Github support it.
   """
   images = [
     {
