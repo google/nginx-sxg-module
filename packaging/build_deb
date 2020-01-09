@@ -30,7 +30,6 @@ readonly WORKDIR="$(mktemp -d)"
 echo "Working in ${WORKDIR}"
 cd "${WORKDIR}"
 
-apt-get update -y
 apt-get source nginx-full
 cd nginx-*
 sed -i \

@@ -23,11 +23,11 @@ RUN grep -q "# deb-src" /etc/apt/sources.list && sed -Ei 's/^# deb-src /deb-src 
 
 RUN git clone -b debian http://github.com/google/libsxg.git /libsxg && \
     cd /libsxg && \
-    sed -i -e "s/^debuild/debuild -uc -us/" build_deb && \
-    sed -i -e "s/^lintian.*$//g" build_deb && \
+    sed -i -e "s/^debuild/debuild -uc -us/" \
+           -e "s/^lintian.*$//g" build_deb && \
     ./build_deb http://github.com/google/libsxg && \
     dpkg -i output/libsxg0.2_0.2-1_amd64.deb && \
-    dpkg -i output/libsxg-dev_0.2-1_amd64.deb
+            output/libsxg-dev_0.2-1_amd64.deb
 
 ADD . /nginx-sxg-module
 WORKDIR /nginx-sxg-module
