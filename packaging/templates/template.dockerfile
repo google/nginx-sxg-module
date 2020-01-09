@@ -3,8 +3,9 @@ FROM {base_image}
 LABEL maintainer "Hiroki Kumazaki <kumagi@google.com>"
 
 RUN grep -q "# deb-src" /etc/apt/sources.list && sed -Ei 's/^# deb-src /deb-src /' /etc/apt/sources.list || \
-    cat /etc/apt/sources.list | grep "^deb " | sed -e "s/^deb /deb-src /" | tee -a /etc/apt/sources.list && \
-    apt-get update && \
+    cat /etc/apt/sources.list | grep "^deb " | sed -e "s/^deb /deb-src /" | tee -a /etc/apt/sources.list
+    
+RUN apt-get update && \
     apt-get install -y --no-install-recommends -q \
                     build-essential \
                     ca-certificates \
@@ -24,7 +25,7 @@ RUN grep -q "# deb-src" /etc/apt/sources.list && sed -Ei 's/^# deb-src /deb-src 
 RUN git clone -b debian http://github.com/google/libsxg.git /libsxg && \
     cd /libsxg && \
     sed -i -e "s/^debuild/debuild -uc -us/" \
-           -e "s/^lintian.*$//g" build_deb && \
+           -e "s/^lintian.*$/d" build_deb && \
     ./build_deb http://github.com/google/libsxg && \
     dpkg -i output/libsxg0.2_0.2-1_amd64.deb && \
             output/libsxg-dev_0.2-1_amd64.deb
