@@ -1,9 +1,10 @@
 # NGINX SXG extension
+
 [![Build Status](https://travis-ci.org/google/nginx-sxg-module.svg?branch=master)](https://travis-ci.org/google/nginx-sxg-module)
 
-Signed HTTP Exchange(SXG) support for nginx. Nginx will convert response from
-upstream application into SXG, only for clients request on `Accept:
-application/signed-exchane;v=b3` with highest qvalue.
+Signed HTTP Exchange (SXG) support for nginx. Nginx will convert responses from
+the upstream application into SXG when client requests include the `Accept:
+application/signed-exchane;v=b3` HTTP header with highest qvalue.
 
 ## Configuration
 
@@ -15,8 +16,8 @@ Nginx-SXG module requires configuration on nginx.
 
 Activation flag of SXG module.
 
--   `on`: Enable this plugin.
--   `off`: Disable this plugin.
+- `on`: Enable this plugin.
+- `off`: Disable this plugin.
 
 Default value is `off`.
 
@@ -25,8 +26,8 @@ Default value is `off`.
 Full path for the certificate file. The certificate requires all of the
 conditions below to match.
 
--   Has `CanSignHttpExchanges` extension.
--   Uses ECDSA256 or ECDSA384.
+- Has `CanSignHttpExchanges` extension.
+- Uses ECDSA256 or ECDSA384.
 
 This directive is always required.
 
@@ -52,7 +53,7 @@ This directive is always required.
 #### sxg\_max\_payload
 
 Maximum HTTP body size this module can generate SXG from. Default value is
-`67108864`(64MiB).
+`67108864` (64 MiB).
 
 ### Config Example
 
