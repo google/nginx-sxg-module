@@ -9,6 +9,7 @@ jobs:
         base_image: ["ubuntu:bionic", "ubuntu:disco", "ubuntu:eoan", "debian:buster"]
     steps:
       - uses: actions/checkout@v1
+
       - name: docker build with arg
         run: |
           mkdir -p output
@@ -16,9 +17,10 @@ jobs:
           docker build --build-arg base_image=${{ matrix.base_image }} -t ${image_name} -f packaging/deb.dockerfile .
           docker run --rm --mount "type=bind,source=$(pwd)/output,target=/nginx-sxg-module/output" ${image_name}
           dpkg -I output/*.deb
+
       - name: Upload to release
         uses: JasonEtco/upload-to-release@master
         with:
-          args: output
+          args: output/*.deb
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,4 +1,4 @@
-name: 'Release .deb files'
+name: 'Build .deb files'
 on: push
 
 jobs:
@@ -9,6 +9,7 @@ jobs:
         base_image: ["ubuntu:bionic", "ubuntu:disco", "ubuntu:eoan", "debian:buster"]
     steps:
       - uses: actions/checkout@v1
+
       - name: docker build with arg
         run: |
           mkdir -p output
