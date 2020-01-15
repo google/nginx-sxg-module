@@ -16,11 +16,10 @@ jobs:
           image_name=$(echo ${{matrix.base_image}} | cut -d: -f2 )
           docker build --build-arg base_image=${{ matrix.base_image }} -t ${image_name} -f packaging/deb.dockerfile .
           docker run --rm --mount "type=bind,source=$(pwd)/output,target=/nginx-sxg-module/output" ${image_name}
-          dpkg -I output/*.deb
-
+          zip libnginx-sxg.zip
       - name: Upload to release
         uses: JasonEtco/upload-to-release@master
         with:
-          args: output/*.deb
+          args: libnginx-sxg.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
