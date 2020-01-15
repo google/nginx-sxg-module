@@ -2,41 +2,23 @@ name: 'Release .deb files'
 on: release
 
 jobs:
-  release-bionic:
+  release-matrix:
     runs-on: ubuntu-latest
-    name: Build and Releasing deb for bionic
+    strategy:
+      matrix:
+        base_image: ["ubuntu:bionic", "ubuntu:disco", "ubuntu:eoan", "debian:buster"]
     steps:
       - uses: actions/checkout@v1
-      - uses: ./.github/actions/bionic
+      - name: docker build with arg
+        run: |
+          mkdir -p output
+          image_name=$(echo ${{matrix.base_image}} | cut -d: -f2 )
+          docker build --build-arg base_image=${{ matrix.base_image }} -t ${image_name} -f packaging/deb.dockerfile .
+          docker run --rm --mount "type=bind,source=$(pwd)/output,target=/nginx-sxg-module/output" ${image_name}
+          dpkg -I output/*.deb
       - name: Upload to release
         uses: JasonEtco/upload-to-release@master
         with:
-          args: libnginx-mod-http-sxg-filter_1.14.0-0ubuntu1.6_amd64.deb
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  release-eoan:
-    runs-on: ubuntu-latest
-    name: Build and Releasing deb for eoan
-    steps:
-      - uses: actions/checkout@v1
-      - uses: ./.github/actions/eoan
-      - name: Upload to release
-        uses: JasonEtco/upload-to-release@master
-        with:
-          args: libnginx-mod-http-sxg-filter_1.16.1-0ubuntu2_amd64.deb
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  release-buster:
-    runs-on: ubuntu-latest
-    name: Build and Releasing deb for buster
-    steps:
-      - uses: actions/checkout@v1
-      - uses: ./.github/actions/buster
-      - name: Upload to release
-        uses: JasonEtco/upload-to-release@master
-        with:
-          args: libnginx-mod-http-sxg-filter_1.14.2-2+deb10u1_amd64.deb
+          args: output
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
