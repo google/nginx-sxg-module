@@ -1,7 +1,0 @@
-name: 'Release {target}'
-descrioption: 'Build and release nginx-module for Ubuntu {target}'
-author: 'kumagi'
-
-runs:
-  using: 'docker'
-  image: 'Dockerfile'
