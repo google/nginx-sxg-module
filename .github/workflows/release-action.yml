@@ -6,21 +6,28 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        base_image: ["ubuntu:bionic", "ubuntu:disco", "ubuntu:eoan", "debian:buster"]
+        names:
+          - base_image: "ubuntu:bionic"
+            image_name: "bionic"
+          - base_image: "ubuntu:disco"
+            image_name: "disco"
+          - base_image: "ubuntu:eoan"
+            image_name: "eoan"
+          - base_image: "debian:buster"
+            image_name: "buster"
     steps:
       - uses: actions/checkout@v1
 
       - name: docker build with arg
         run: |
           mkdir -p output
-          image_name=$(echo ${{ matrix.base_image }} | cut -d: -f2)
-          docker build --build-arg base_image=${{ matrix.base_image }} -t ${image_name} -f packaging/deb.dockerfile .
-          docker run --rm --mount "type=bind,source=$(pwd)/output,target=/nginx-sxg-module/output" ${image_name}
-          zip -r libnginx-sxg-${{ matrix.base_image }}.zip output
+          docker build --build-arg base_image=${{ matrix.names.base_image }} -t ${{ matrix.names.image_name }} -f packaging/deb.dockerfile .
+          docker run --rm --mount "type=bind,source=$(pwd)/output,target=/nginx-sxg-module/output" ${{ matrix.names.image_name }}
+          zip -r libnginx-sxg-${{ matrix.names.image-name }}.zip output
 
       - name: Upload to release
         uses: kumagi/upload-to-release@v0.1.2
         with:
-          args: libnginx-sxg-${{ matrix.base_image }}.zip application/zip
+          args: libnginx-sxg-${{ matrix.names.image_name }}.zip application/zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
