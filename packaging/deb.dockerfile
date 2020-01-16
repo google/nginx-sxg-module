@@ -15,7 +15,7 @@ RUN apt-get update && \
                     git \
                     libssl-dev \
                     lsb-release \
-		    moreutils \
+                    moreutils \
                     wget
 
 RUN grep -q "# deb-src" /etc/apt/sources.list && sed -i -e 's/^# deb-src /deb-src /' /etc/apt/sources.list || \
