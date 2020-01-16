@@ -2,7 +2,7 @@ name: 'Build .deb files'
 on: push
 
 jobs:
-  build-matrix:
+  build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
