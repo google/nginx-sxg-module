@@ -45,7 +45,7 @@ cat << 'EOF' >> debian/control
 
 Package: libnginx-mod-http-sxg-filter
 Architecture: any
-Depends: libsxg0 (>= 0),
+Depends: libsxg0 (>= 0.2),
          ${misc:Depends},
          ${shlibs:Depends}
 Description: Signed HTTP Exchange filter module for nginx.
