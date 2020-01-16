@@ -1,0 +1,31 @@
+name: 'Build .deb files'
+on: push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        names:
+          - base_image: "ubuntu:bionic"
+            image_name: "bionic"
+          - base_image: "ubuntu:disco"
+            image_name: "disco"
+          - base_image: "ubuntu:eoan"
+            image_name: "eoan"
+          - base_image: "debian:buster"
+            image_name: "buster"
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: docker build with arg
+        run: |
+          mkdir -p output
+          docker build --build-arg base_image=${{ matrix.names.base_image }} -t ${{ matrix.names.image_name }} -f packaging/deb.dockerfile .
+          docker run --rm --mount "type=bind,source=$(pwd)/output,target=/nginx-sxg-module/output" ${{ matrix.names.image_name }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v1
+        with:
+          name: nginx-sxg-${{ matrix.names.image_name }}
+          path: output
