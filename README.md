@@ -59,6 +59,13 @@ This directive is always required.
 Maximum HTTP body size this module can generate SXG from. Default value is
 `67108864` (64 MiB).
 
+#### sxg\_cert\_path
+
+The nginx will generate and serve CBOR encoded certificate file in this path.
+This is convenient when you want to serve certificate CBOR file from nginx.
+But make sure that the CA of certificate is accessible from your nginx server to enable getting OCSP response.
+This value is optional.
+
 ### Config Example
 
 ```
