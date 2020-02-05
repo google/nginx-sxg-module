@@ -98,6 +98,6 @@ http {
 
 ### Subresource support
 
-This plugin embeds subresource integrity on generating SXG.
-On finding `link: rel="preload"` entry in HTTP response header from upstream, this plugin will collect the specified resource to the upstream and append `rel="allowd-alt-sxg";header-integrity="sha256-...."` to the original HTTP response automatically.
+nginx-sxg-module automatically includes signatures of subresources in its responses, allowing end users to prefetch it from distributor.
+When finding `link: rel="preload"` entry in HTTP response header from upstream, this plugin will collect the specified resource to the upstream and append `rel="allowed-alt-sxg";header-integrity="sha256-...."` to the original HTTP response automatically.
 This functionality is essential to subresource preloading for faster cross-site navigation.
