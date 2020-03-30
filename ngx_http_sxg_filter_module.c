@@ -441,12 +441,24 @@ static bool copy_buffer_to_sxg_buffer(const ngx_chain_t* in, sxg_buffer_t* buf,
   *last_buf = false;
   for (const ngx_chain_t* cl = in; cl != NULL; cl = cl->next) {
     if (cl->buf != NULL) {
-      const size_t copy_size = cl->buf->last - cl->buf->pos;
-      if (buf->size + copy_size > limit ||
-          !sxg_write_bytes(cl->buf->pos, copy_size, buf)) {
-        return false;
+      if (cl->buf->in_file) {
+        const size_t copy_size = cl->buf->file_last - cl->buf->file_pos;
+        const size_t buffer_tail = buf->size;
+        sxg_buffer_resize(buf->size + copy_size, buf);
+        const ssize_t copied_size =
+            ngx_read_file(cl->buf->file, &buf->data[buffer_tail], copy_size,
+                          cl->buf->file_pos);
+        if (copied_size != copy_size) {
+          return false;
+        }
+      } else if (cl->buf->memory) {
+        const size_t copy_size = cl->buf->last - cl->buf->pos;
+        if (buf->size + copy_size > limit ||
+            !sxg_write_bytes(cl->buf->pos, copy_size, buf)) {
+          return false;
+        }
+        cl->buf->pos = cl->buf->last; /* Consuming buffer */
       }
-      cl->buf->pos = cl->buf->last; /* Consuming buffer */
       *last_buf |= cl->buf->last_buf;
     }
   }
