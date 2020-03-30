@@ -446,7 +446,7 @@ static bool copy_buffer_to_sxg_buffer(const ngx_http_request_t* req,
         const size_t copy_size = cl->buf->file_last - cl->buf->file_pos;
         const size_t buffer_tail = buf->size;
         if (buffer_tail + copy_size > limit) {
-          ngx_log_error(NGX_LOG_NOTICE, req->connection->log, 0,
+          ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
                         "Too large buffer size required: %d bytes",
                         buffer_tail + copy_size);
           return false;
@@ -456,21 +456,20 @@ static bool copy_buffer_to_sxg_buffer(const ngx_http_request_t* req,
             ngx_read_file(cl->buf->file, buf->data + buffer_tail, copy_size,
                           cl->buf->file_pos);
         if (copied_size != copy_size) {
-          ngx_log_error(NGX_LOG_NOTICE, req->connection->log, 0,
+          ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
                         "Failed to read buffer from file");
           return false;
         }
       } else if (cl->buf->memory) {
         const size_t copy_size = cl->buf->last - cl->buf->pos;
         if (buf->size + copy_size > limit) {
-          ngx_log_error(NGX_LOG_NOTICE, req->connection->log, 0,
+          ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
                         "Too large buffer size required: %d bytes",
                         buf->size + copy_size);
           return false;
         } else if (!sxg_write_bytes(cl->buf->pos, copy_size, buf)) {
-          ngx_log_error(NGX_LOG_NOTICE, req->connection->log, 0,
-                        "Failed to allocate SXG buffer: %d bytes",
-                        copy_size);
+          ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
+                        "Failed to allocate SXG buffer: %d bytes", copy_size);
         }
         cl->buf->pos = cl->buf->last; /* Consuming buffer */
       }
