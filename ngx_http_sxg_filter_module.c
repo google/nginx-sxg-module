@@ -455,7 +455,7 @@ static bool copy_buffer_to_sxg_buffer(const ngx_http_request_t* req,
         const ssize_t copied_size =
             ngx_read_file(cl->buf->file, buf->data + buffer_tail, copy_size,
                           cl->buf->file_pos);
-        if (copied_size != copy_size) {
+        if (copied_size == NGX_ERROR || (size_t)copied_size != copy_size) {
           ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
                         "Failed to read buffer from file");
           return false;
