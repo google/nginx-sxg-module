@@ -167,7 +167,7 @@ bool highest_qvalue_is_sxg(const char* str, size_t len) {
     const size_t tail = get_term_length(str, len, ',', "<>");
     const bool is_sxg = term_is_sxg(str, tail);
     const int p = get_priority(str, tail);
-    if (max_priority < p) {
+    if (max_priority < p || (max_priority == p && is_sxg)) {
       should_be_sxg = is_sxg;
       max_priority = p;
     }
