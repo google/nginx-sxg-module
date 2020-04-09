@@ -51,6 +51,8 @@ TEST(NgxSxgUtilsTest, ShouldBeSignedExchange) {
       "application/signed-exchange;v=b3;q=1.000   ,text/html;q=0.999"));
   EXPECT_TRUE(ShouldBeSXG(
       "application/signed-exchange;q=0.999; v=b3 ,text/html; q=0.998 "));
+  EXPECT_TRUE(ShouldBeSXG("application/signed-exchange;v=b3,text/html"));
+  EXPECT_TRUE(ShouldBeSXG("*/*,text/html,application/signed-exchange;v=b3"));
   EXPECT_FALSE(ShouldBeSXG("v=b3"));
   EXPECT_FALSE(
       ShouldBeSXG("application/signed-exchange;q=0.9999;v=b3,text/html;q=0.5"));
