@@ -9,10 +9,10 @@ jobs:
         names:
           - base_image: "ubuntu:bionic"
             image_name: "bionic"
-          - base_image: "ubuntu:disco"
-            image_name: "disco"
           - base_image: "ubuntu:eoan"
             image_name: "eoan"
+          - base_image: "ubuntu:focal"
+            image_name: "focal"
           - base_image: "debian:buster"
             image_name: "buster"
     steps:
