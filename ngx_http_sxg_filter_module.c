@@ -161,10 +161,8 @@ static char* ngx_http_sxg_merge_srv_conf(ngx_conf_t* cf, void* parent,
 static bool response_should_be_sxg(const ngx_http_request_t* const req) {
   static const char kAccept[] = "Accept";
 
-  ngx_log_error(NGX_LOG_NOTICE, req->connection->log, 0, "req is %p", req);
   for (const ngx_list_part_t* part = &req->headers_in.headers.part;
        part != NULL; part = part->next) {
-    ngx_log_error(NGX_LOG_NOTICE, req->connection->log, 0, "part is %p", part);
     ngx_table_elt_t* table = part->elts;
     for (unsigned int i = 0; i < part->nelts; ++i) {
       if (table[i].key.len == strlen(kAccept) &&
@@ -447,7 +445,8 @@ static bool copy_buffer_to_sxg_buffer(const ngx_http_request_t* req,
         const size_t buffer_tail = buf->size;
         if (buffer_tail + copy_size > limit) {
           ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                        "Too large buffer size required: %d bytes",
+                        "nginx-sxg-module: too large buffer size required "
+                        "%d bytes",
                         buffer_tail + copy_size);
           return false;
         }
@@ -457,19 +456,22 @@ static bool copy_buffer_to_sxg_buffer(const ngx_http_request_t* req,
                           cl->buf->file_pos);
         if (copied_size == NGX_ERROR || (size_t)copied_size != copy_size) {
           ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                        "Failed to read buffer from file");
+                        "nginx-sxg-module: failed to read buffer from file");
           return false;
         }
       } else if (cl->buf->memory) {
         const size_t copy_size = cl->buf->last - cl->buf->pos;
         if (buf->size + copy_size > limit) {
           ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                        "Too large buffer size required: %d bytes",
+                        "nginx-sxg-module: too large buffer size required: "
+                        "%d bytes",
                         buf->size + copy_size);
           return false;
         } else if (!sxg_write_bytes(cl->buf->pos, copy_size, buf)) {
           ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                        "Failed to allocate SXG buffer: %d bytes", copy_size);
+                        "nginx-sxg-module: failed to allocate SXG buffer: "
+                        "%d bytes",
+                        copy_size);
         }
         cl->buf->pos = cl->buf->last; /* Consuming buffer */
       }
@@ -551,8 +553,8 @@ static ngx_int_t ngx_http_sxg_body_filter(ngx_http_request_t* req,
   sxg_raw_response_release(&ctx->response);
 
   if (!success) {
-    ngx_log_error(NGX_LOG_NOTICE, req->connection->log, 0,
-                  "failed to generate sxg");
+    ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
+                  "nginx-sxg-module: failed to generate sxg");
     sxg_buffer_release(&sxg);
     return NGX_ERROR;
   }
@@ -565,7 +567,8 @@ static ngx_int_t ngx_http_sxg_body_filter(ngx_http_request_t* req,
   }
 
   ngx_log_error(NGX_LOG_NOTICE, req->connection->log, 0,
-                "Send sxg %l bytes, %d", sxg.size, req->header_sent);
+                "nginx-sxg-module: Send sxg %l bytes, %d", sxg.size,
+                req->header_sent);
 
   sxg_buffer_release(&sxg);
 
@@ -580,21 +583,23 @@ static bool is_valid_config(ngx_conf_t* nc, const ngx_http_sxg_srv_conf_t* sc) {
   bool valid = true;
   if (sc->certificate.len == 0) {
     valid = false;
-    ngx_log_error(NGX_LOG_NOTICE, nc->log, 0, "sxg_certificate not specified");
+    ngx_log_error(NGX_LOG_CRIT, nc->log, 0,
+                  "nginx-sxg-module: sxg_certificate not specified");
   }
   if (sc->certificate_key.len == 0) {
     valid = false;
-    ngx_log_error(NGX_LOG_NOTICE, nc->log, 0,
-                  "sxg_certificate_key not specified");
+    ngx_log_error(NGX_LOG_CRIT, nc->log, 0,
+                  "nginx-sxg-module: sxg_certificate_key not specified");
   }
   if (sc->validity_url.len == 0) {
     valid = false;
-    ngx_log_error(NGX_LOG_NOTICE, nc->log, 0, "sxg_validity_url not specified");
+    ngx_log_error(NGX_LOG_CRIT, nc->log, 0,
+                  "nginx-sxg-module: sxg_validity_url not specified");
   }
   if (sc->cert_url.len == 0) {
     valid = false;
-    ngx_log_error(NGX_LOG_NOTICE, nc->log, 0,
-                  "sxg_certificate_url not specified");
+    ngx_log_error(NGX_LOG_CRIT, nc->log, 0,
+                  "nginx-sxg-module: sxg_certificate_url not specified");
   }
   return valid;
 }
@@ -624,8 +629,9 @@ static ngx_int_t ngx_http_cert_chain_handler(ngx_http_request_t* req) {
   }
   bool refreshed = refresh_if_needed(&ssc->cert_chain);
   if (refreshed) {
-    ngx_log_error(NGX_LOG_INFO, req->connection->log, 0,
-                  "OCSP Response in Certificate-Chain is refreshed.");
+    ngx_log_error(
+        NGX_LOG_INFO, req->connection->log, 0,
+        "nginx-sxg-module: OCSP Response in Certificate-Chain is refreshed.");
   }
   req->headers_out.status = NGX_HTTP_OK;
   req->headers_out.content_length_n =
@@ -640,13 +646,13 @@ static ngx_int_t ngx_http_cert_chain_handler(ngx_http_request_t* req) {
   if (!make_chain_from_buffer(req, &ssc->cert_chain.serialized_cert_chain,
                               &out)) {
     ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                  "Failed to generate Cert-Chain.");
+                  "nginx-sxg-module: failed to generate Cert-Chain.");
     return NGX_ERROR;
   }
   if (ngx_http_next_header_filter(req) != NGX_OK ||
       ngx_http_next_body_filter(req, out) != NGX_OK) {
     ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                  "Failed to return payload.");
+                  "nginx-sxg-module: failed to return payload.");
     return NGX_ERROR;
   }
   return NGX_DONE;
@@ -681,6 +687,8 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
     }
 
     if (!is_valid_config(cf, nscf)) {
+      ngx_log_error(NGX_LOG_NOTICE, cf->log, 0,
+                    "nginx-sxg-module: invalid config");
       return NGX_ERROR;
     }
 
@@ -691,6 +699,9 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
                               (const char*)nscf->validity_url.data, privkey,
                               cert, (const char*)nscf->cert_url.data,
                               &nscf->signers)) {
+      ngx_log_error(NGX_LOG_NOTICE, cf->log, 0,
+                    "nginx-sxg-module: failed to load certificates");
+
       return NGX_ERROR;
     }
     if (nscf->cert_path.len > 0 &&
@@ -698,6 +709,16 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
                          &nscf->cert_chain)) {
       return NGX_ERROR;
     }
+
+    ngx_log_error(NGX_LOG_NOTICE, cf->log, 0,
+                  "nginx-sxg-module: successfully started with below settings\n"
+                  "SXG Certificate: %V\n"
+                  "SXG PrivateKey: %V\n"
+                  "certificate_url: %V\n"
+                  "validity_url: %V\n"
+                  "cert_path: %V",
+                  &nscf->certificate, &nscf->certificate_key, &nscf->cert_url,
+                  &nscf->validity_url, &nscf->cert_path);
 
     EVP_PKEY_free(privkey);
     X509_free(cert);
@@ -712,8 +733,11 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
   ngx_http_handler_pt* h =
       ngx_array_push(&cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers);
   if (h == NULL) {
+    ngx_log_error(NGX_LOG_NOTICE, cf->log, 0,
+                  "nginx-sxg-module: initialization failed");
     return NGX_ERROR;
   }
+
   *h = ngx_http_cert_chain_handler;
   return NGX_OK;
 }
