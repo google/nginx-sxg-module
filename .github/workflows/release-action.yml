@@ -23,7 +23,7 @@ jobs:
           mkdir -p output
           docker build --build-arg base_image=${{ matrix.names.base_image }} -t ${{ matrix.names.image_name }} -f packaging/deb.dockerfile .
           docker run --rm --mount "type=bind,source=$(pwd)/output,target=/nginx-sxg-module/output" ${{ matrix.names.image_name }}
-          zip -r libnginx-sxg-${{ matrix.names.image-name }}.zip output
+          zip -r libnginx-sxg-${{ matrix.names.image_name }}.zip output
 
       - name: Upload to release
         uses: kumagi/upload-to-release@v0.1.2
