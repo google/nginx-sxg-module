@@ -3,6 +3,8 @@ FROM ${base_image}
 
 LABEL maintainer "Hiroki Kumazaki <kumagi@google.com>"
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends -q \
                     build-essential \
