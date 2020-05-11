@@ -842,7 +842,6 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
                               &nscf->signers)) {
       ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                     "nginx-sxg-module: failed to allocate memory");
-
       return NGX_ERROR;
     }
     if (nscf->cert_path.len > 0 &&
