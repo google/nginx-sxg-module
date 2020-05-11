@@ -694,6 +694,12 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
 
     EVP_PKEY* privkey =
         load_private_key((const char*)nscf->certificate_key.data);
+    if (privkey == NULL) {
+      ngx_log_error(NGX_LOG_NOTICE, cf->log, 0,
+                    "nginx-sxg-module: failed to load private key %V",
+                    &nscf->certificate_key);
+      return NGX_ERROR;
+    }
     X509* cert = load_x509_cert((const char*)nscf->certificate.data);
     if (!sxg_add_ecdsa_signer("nginx", /*date=*/0, /*expires=*/0,
                               (const char*)nscf->validity_url.data, privkey,
