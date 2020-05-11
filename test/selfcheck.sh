@@ -3,7 +3,7 @@
 cat /etc/nginx/sites-enabled/default
 cat /etc/nginx/sites-enabled/nginx-sxg.conf
 rm /etc/nginx/sites-enabled/default
-service nginx restart
+service nginx restart || cat /var/log/nginx/error.log
 
 rm -rf out
 mkdir out

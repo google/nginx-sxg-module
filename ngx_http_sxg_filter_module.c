@@ -687,7 +687,7 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
     }
 
     if (!is_valid_config(cf, nscf)) {
-      ngx_log_error(NGX_LOG_ERR, cf->log, 0,
+      ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                     "nginx-sxg-module: invalid config");
       return NGX_ERROR;
     }
@@ -695,14 +695,14 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
     EVP_PKEY* privkey =
         load_private_key((const char*)nscf->certificate_key.data);
     if (privkey == NULL) {
-      ngx_log_error(NGX_LOG_ERR, cf->log, 0,
+      ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                     "nginx-sxg-module: failed to load private key %V",
                     &nscf->certificate_key);
       return NGX_ERROR;
     }
     X509* cert = load_x509_cert((const char*)nscf->certificate.data);
     if (cert == NULL) {
-      ngx_log_error(NGX_LOG_ERR, cf->log, 0,
+      ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                     "nginx-sxg-module: failed to load certificate %V",
                     &nscf->certificate);
       return NGX_ERROR;
@@ -712,7 +712,7 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
                               (const char*)nscf->validity_url.data, privkey,
                               cert, (const char*)nscf->cert_url.data,
                               &nscf->signers)) {
-      ngx_log_error(NGX_LOG_ERR, cf->log, 0,
+      ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                     "nginx-sxg-module: failed to load certificates");
 
       return NGX_ERROR;
