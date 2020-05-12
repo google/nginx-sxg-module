@@ -696,14 +696,14 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
         load_private_key((const char*)nscf->certificate_key.data);
     if (privkey == NULL) {
       ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                    "nginx-sxg-module: failed to load private key %V",
+                    "nginx-sxg-module: failed to load private key at %V",
                     &nscf->certificate_key);
       return NGX_ERROR;
     }
     X509* cert = load_x509_cert((const char*)nscf->certificate.data);
     if (cert == NULL) {
       ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                    "nginx-sxg-module: failed to load certificate %V",
+                    "nginx-sxg-module: failed to load certificate at %V",
                     &nscf->certificate);
       return NGX_ERROR;
     }
@@ -713,7 +713,7 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
                               cert, (const char*)nscf->cert_url.data,
                               &nscf->signers)) {
       ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
-                    "nginx-sxg-module: failed to load certificates");
+                    "nginx-sxg-module: failed to allocate memory");
 
       return NGX_ERROR;
     }
