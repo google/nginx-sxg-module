@@ -216,6 +216,31 @@ bool param_is_preload(const char* param, size_t len) {
   }
 }
 
+bool param_is_as(const char* param, size_t len, const char** value,
+                 size_t* value_len) {
+  static const char kRel[] = "as=";
+  *value = NULL;
+  *value_len = 0;
+  if (len < sizeof(kRel) - 1 ||
+      strncmp((char*)param, kRel, sizeof(kRel) - 1) != 0) {
+    return false;
+  }
+  param += sizeof(kRel) - 1;
+  len -= sizeof(kRel) - 1;
+  if (len > 0 && *param == '"') {
+    const char* end = strchr(param + 1, '"');
+    if (end == NULL) {
+      return false;
+    }
+    *value = param + 1;
+    *value_len = end - param - 1;
+  } else {
+    *value = param;
+    *value_len = len;
+  }
+  return true;
+}
+
 EVP_PKEY* load_private_key(const char* filepath) {
   FILE* const fp = fopen(filepath, "r");
   if (!fp) {
