@@ -273,12 +273,18 @@ static ngx_int_t subresource_fetch_handler(ngx_http_request_t* req, void* data,
   if (req->done) {
     return NGX_OK;
   }
+  if (req->upstream->headers_in.status_n != 200) {
+    // Even if fetching subresource failed, we ignore it.
+    --ctx->subresources;
+    return NGX_OK;
+  }
+
   if (req->out->buf->last - req->out->buf->pos == req->upstream->length) {
     ngx_http_set_ctx(req, ctx, ngx_http_sxg_filter_module);
     sxg_buffer_t integrity = sxg_empty_buffer();
     sxg_buffer_t new_header_entry = sxg_empty_buffer();
 
-    // Searches 'as' statement of original link header.
+    // Searche 'as' statement of original link header.
     ngx_str_t as;
     ngx_array_t* subresource_list = &ctx->subresource_list;
     ngx_subresource_t* subresource = subresource_list->elts;
@@ -289,7 +295,7 @@ static ngx_int_t subresource_fetch_handler(ngx_http_request_t* req, void* data,
       }
     }
 
-    if (sxg_write_string("<https://", &new_header_entry) &&
+    if (as.len > 0 && sxg_write_string("<https://", &new_header_entry) &&
         buffer_write_str_t(&cscf->server_name, &new_header_entry) &&
         buffer_write_str_t(&req->uri, &new_header_entry) &&
         sxg_write_string(">;rel=\"preload\";as=\"", &new_header_entry) &&
