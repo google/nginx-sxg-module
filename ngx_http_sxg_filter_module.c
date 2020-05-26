@@ -417,8 +417,9 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
 static char* construct_fallback_url(const ngx_http_request_t* req) {
   static const char kHttpsPrefix[] = "https://";
   const char* path_end = memchr(req->uri.data, ' ', req->uri.len);
-  const int path_length =
-      path_end != NULL ? (path_end - (char*)req->uri.data) : (int)req->uri.len;
+  const int path_length = (path_end != NULL ? (path_end - (char*)req->uri.data)
+                                            : (int)req->uri.len) +
+                          (req->args.len > 0 ? (int)req->args.len + 1 : 0);
 
   const char* host = (const char*)req->headers_in.host->value.data;
   int fallback_url_length = sizeof(kHttpsPrefix) + strlen(host) + path_length;
@@ -427,8 +428,14 @@ static char* construct_fallback_url(const ngx_http_request_t* req) {
     return NULL;
   }
 
-  snprintf(fallback_url, fallback_url_length, "%s%s%.*s", kHttpsPrefix, host,
-           path_length, req->uri.data);
+  if (req->args.len > 0) {
+    snprintf(fallback_url, fallback_url_length, "%s%s%.*s?%.*s", kHttpsPrefix,
+             host, path_length, req->uri.data, (int)req->args.len,
+             req->args.data);
+  } else {
+    snprintf(fallback_url, fallback_url_length, "%s%s%.*s", kHttpsPrefix, host,
+             path_length, req->uri.data);
+  }
   return fallback_url;
 }
 
