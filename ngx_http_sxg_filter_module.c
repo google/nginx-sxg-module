@@ -285,13 +285,14 @@ static ngx_int_t subresource_fetch_handler(ngx_http_request_t* req, void* data,
     sxg_buffer_t new_header_entry = sxg_empty_buffer();
 
     // Searche 'as' statement of original link header.
-    ngx_str_t as;
+    ngx_str_t as = ngx_null_string;
     ngx_array_t* subresource_list = &ctx->subresource_list;
     ngx_subresource_t* subresource = subresource_list->elts;
     for (int i = 0; i < subresource_list->nelts; ++i) {
       if (ngx_strncmp(subresource[i].url.data, req->uri.data,
                       subresource[i].url.len) == 0) {
         as = subresource[i].as;
+        break;
       }
     }
 
@@ -332,26 +333,17 @@ static ngx_str_t extract_angled_url(char* str, size_t len) {
   return (ngx_str_t){.data = NULL, .len = 0};
 }
 
-bool concat_str(ngx_str_t* target, const char* buff, size_t len,
-                ngx_pool_t* pool) {
-  u_char* new_buffer = ngx_palloc(pool, target->len + len);
-  if (new_buffer == NULL) {
-    return false;
-  }
-  ngx_memcpy(new_buffer, target->data, target->len);
-  ngx_memcpy(new_buffer + target->len, buff, len);
-  ngx_pfree(pool, target->data);
-  target->data = new_buffer;
-  target->len += len;
-  return true;
-}
-
 // TODO(kumagi): Complex logic should be migrated to ngx_sxg_utils.c.
-static void extract_preload_url_list(ngx_str_t* link, ngx_array_t* const dst,
-                                     ngx_str_t* non_preload_headers,
-                                     ngx_http_request_t* r) {
+// Extracts URL list `dst` from `link` like </foo.js>;rel="preload";as="script"
+// Returns length of non-preload header string.
+// If `dst` is NULL, it just calculate the length of estimatec
+// non_preload_headers.
+static size_t extract_preload_url_list(ngx_str_t* link, ngx_array_t* const dst,
+                                       ngx_str_t* non_preload_headers,
+                                       ngx_http_request_t* r) {
   char* str = (char*)link->data;
   char* end = str + link->len;
+  size_t non_preload_headers_len = 0;
   while (str < end) {
     const size_t tail = get_term_length(str, end - str, ',', "<>");
     ngx_str_t url = extract_angled_url(str, tail);
@@ -359,44 +351,58 @@ static void extract_preload_url_list(ngx_str_t* link, ngx_array_t* const dst,
     bool found = false;
     ngx_subresource_t* new_preload = NULL;
     ngx_str_t as = ngx_null_string;
+
     while (param < str + tail) {
       const size_t rest = str + tail - param;
       size_t param_tail = get_term_length(param, rest, ';', "<>");
+
       if (param_is_preload(param, param_tail)) {
-        new_preload = ngx_array_push(dst);
-        new_preload->url.data = ngx_palloc(r->pool, url.len);
-        new_preload->url.len = url.len;
-        ngx_memcpy(new_preload->url.data, url.data, url.len);
-        while (new_preload->url.data[new_preload->url.len - 1] == ' ') {
-          new_preload->url.len--;
+        if (dst != NULL) {
+          new_preload = ngx_array_push(dst);
+          new_preload->url.data = ngx_palloc(r->pool, url.len);
+          new_preload->url.len = url.len;
+          ngx_memcpy(new_preload->url.data, url.data, url.len);
+          while (new_preload->url.data[new_preload->url.len - 1] == ' ') {
+            new_preload->url.len--;
+          }
+          if (as.data != NULL) {
+            new_preload->as = as;
+          }
         }
         found = true;
-
-        if (as.data != NULL) {
-          new_preload->as = as;
-        }
       }
       if (param_is_as(param, param_tail, (const char**)&as.data, &as.len)) {
-        if (found) {
+        if (found && new_preload != NULL) {
           new_preload->as = as;
-          ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                        "found as statement in link preload header: %V",
-                        &new_preload->as);
+          ngx_log_error(
+              NGX_LOG_DEBUG, r->connection->log, 0,
+              "nginx-sxg-module: found as statement in link preload header: %V",
+              &new_preload->as);
         }
       }
       param += param_tail + 1;
     }
     if (!found) {
-      if (non_preload_headers->len > 0) {
-        concat_str(non_preload_headers, ",", 1, r->pool);
+      if (non_preload_headers == NULL) {
+        if (non_preload_headers_len > 0) {
+          ++non_preload_headers_len;
+        }
+        non_preload_headers_len += tail;
+      } else {
+        if (non_preload_headers->len > 0) {
+          ngx_memcpy(non_preload_headers->data + non_preload_headers_len, ",",
+                     1);
+          ++non_preload_headers_len;
+        }
+        ngx_memcpy(non_preload_headers->data + non_preload_headers_len, str,
+                   tail);
+        non_preload_headers_len += tail;
       }
-      concat_str(non_preload_headers, str, tail, r->pool);
     }
     str += tail + 1;
   }
 
-  ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
-                "non preload link headers: %V", non_preload_headers);
+  return non_preload_headers_len;
 }
 
 static ngx_array_t* get_preload_list(ngx_str_t* link,
@@ -404,6 +410,10 @@ static ngx_array_t* get_preload_list(ngx_str_t* link,
                                      ngx_http_request_t* req) {
   ngx_array_t* const urls =
       ngx_array_create(req->pool, 1, sizeof(ngx_subresource_t));
+  size_t non_preload_headers_len =
+      extract_preload_url_list(link, NULL, NULL, req);
+  non_preload_headers->data = ngx_palloc(req->pool, non_preload_headers_len);
+  non_preload_headers->len = non_preload_headers_len;
   extract_preload_url_list(link, urls, non_preload_headers, req);
   return urls;
 }
