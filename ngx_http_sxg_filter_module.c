@@ -458,8 +458,7 @@ static bool copy_buffer_to_sxg_buffer(const ngx_http_request_t* req,
           return false;
         }
         cl->buf->pos = cl->buf->last; /* Consuming buffer */
-      }
-      else if (cl->buf->in_file) {
+      } else if (cl->buf->in_file) {
         const size_t buffer_tail = buf->size;
         sxg_buffer_resize(buf->size + copy_size, buf);
         const ssize_t copied_size =
@@ -471,7 +470,7 @@ static bool copy_buffer_to_sxg_buffer(const ngx_http_request_t* req,
           return false;
         }
         cl->buf->file_pos = cl->buf->file_last; /* Consuming buffer */
-      } 
+      }
       *last_buf |= cl->buf->last_buf;
     }
   }
