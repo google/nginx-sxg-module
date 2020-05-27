@@ -336,8 +336,8 @@ static ngx_str_t extract_angled_url(char* str, size_t len) {
 // TODO(kumagi): Complex logic should be migrated to ngx_sxg_utils.c.
 // Extracts URL list `dst` from `link` like </foo.js>;rel="preload";as="script"
 // Returns length of non-preload header string.
-// If `dst` is NULL, it just calculate the length of estimatec
-// non_preload_headers.
+// If `dst` is NULL, it does nothing than calculates and returns the required
+// length for `non_preload_headers`.
 static size_t extract_preload_url_list(ngx_str_t* link, ngx_array_t* const dst,
                                        ngx_str_t* non_preload_headers,
                                        ngx_http_request_t* r) {
@@ -363,7 +363,7 @@ static size_t extract_preload_url_list(ngx_str_t* link, ngx_array_t* const dst,
           new_preload->url.len = url.len;
           ngx_memcpy(new_preload->url.data, url.data, url.len);
           while (new_preload->url.data[new_preload->url.len - 1] == ' ') {
-            new_preload->url.len--;
+            new_preload->url.data[--new_preload->url.len] = '\0';
           }
           if (as.data != NULL) {
             new_preload->as = as;
