@@ -75,6 +75,11 @@ bool ParamIsPreload(const std::string& input) {
 
 TEST(NgxSxgUtilsTest, ParamIsPreload) {
   EXPECT_TRUE(ParamIsPreload("rel=preload"));
+  EXPECT_TRUE(ParamIsPreload(" rel=preload"));
+  EXPECT_TRUE(ParamIsPreload("rel=preload "));
+  EXPECT_TRUE(ParamIsPreload("rel= preload"));
+  EXPECT_TRUE(ParamIsPreload("rel=\" preload\""));
+  EXPECT_TRUE(ParamIsPreload("rel=\"preload \""));
   EXPECT_TRUE(ParamIsPreload(R"(rel="preload")"));
   EXPECT_TRUE(ParamIsPreload(R"(rel="alter preload hello world")"));
   EXPECT_FALSE(ParamIsPreload("preload=rel"));
@@ -86,6 +91,9 @@ TEST(NgxSxgUtilsTest, ParamIsPreload) {
   EXPECT_FALSE(ParamIsPreload("rel=\"\n \""));
   EXPECT_FALSE(ParamIsPreload("r"));
   EXPECT_FALSE(ParamIsPreload("rel=prepreload"));
+
+  // TODO: we should support this pattern.
+  // EXPECT_TRUE(ParamIsPreload("rel= preload"));
 }
 
 TEST(NgxSxgCertChain, free) {

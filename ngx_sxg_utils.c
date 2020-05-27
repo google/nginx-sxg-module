@@ -177,16 +177,29 @@ bool highest_qvalue_is_sxg(const char* str, size_t len) {
   return should_be_sxg;
 }
 
+// Truncates optional white spaces at head and tail.
+static void strip(const char** str, size_t* len) {
+  while (**str == ' ' || **str == '\t') {
+    ++*str;
+    --*len;
+  }
+  while ((*str)[*len - 1] == ' ' || (*str)[*len - 1] == '\t') {
+    --*len;
+  }
+}
+
 // Finds |desired| word exists in quoted and space-separated string.
 // The |desired| word must not contain space.
 // |desired| must be null terminated.
 static bool quoted_string_match(const char* str, size_t len,
                                 const char* desired) {
+  strip(&str, &len);
   if (str[0] != '"' || str[len - 1] != '"') {
     return false;
   }
   ++str;     // Skip '"'.
   len -= 2;  // Omit first and last '"'.
+  strip(&str, &len);
   const size_t desired_length = strlen(desired);
   const char* const end = str + len;
   while (str < end) {
@@ -201,6 +214,7 @@ static bool quoted_string_match(const char* str, size_t len,
 }
 
 bool param_is_preload(const char* param, size_t len) {
+  strip(&param, &len);
   static const char kRel[] = "rel=";
   static const char kPreload[] = "preload";
   if (len < sizeof(kRel) - 1 ||
@@ -212,12 +226,14 @@ bool param_is_preload(const char* param, size_t len) {
   if (len > 0 && *param == '"') {
     return quoted_string_match(param, len, kPreload);
   } else {
+    strip(&param, &len);
     return len == sizeof(kPreload) - 1 && memcmp(param, kPreload, len) == 0;
   }
 }
 
 bool param_is_as(const char* param, size_t len, const char** value,
                  size_t* value_len) {
+  strip(&param, &len);
   static const char kRel[] = "as=";
   *value = NULL;
   *value_len = 0;
@@ -227,6 +243,7 @@ bool param_is_as(const char* param, size_t len, const char** value,
   }
   param += sizeof(kRel) - 1;
   len -= sizeof(kRel) - 1;
+  strip(&param, &len);
   if (len > 0 && *param == '"') {
     const char* end = strchr(param + 1, '"');
     if (end == NULL) {
