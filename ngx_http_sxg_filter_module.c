@@ -281,10 +281,28 @@ static ngx_int_t subresource_fetch_handler(ngx_http_request_t* req, void* data,
 
   if (req->out->buf->last - req->out->buf->pos == req->upstream->length) {
     ngx_http_set_ctx(req, ctx, ngx_http_sxg_filter_module);
+    sxg_buffer_t url = sxg_empty_buffer();
     sxg_buffer_t integrity = sxg_empty_buffer();
     sxg_buffer_t new_header_entry = sxg_empty_buffer();
 
-    // Searche 'as' statement of original link header.
+    // Set URL which includes headers and parameters.
+    if (!sxg_write_string("https://", &url) ||
+        !buffer_write_str_t(&cscf->server_name, &url) ||
+        !buffer_write_str_t(&req->uri, &url)) {
+      sxg_buffer_release(&url);
+      --ctx->subresources;
+      return NGX_ERROR;
+    }
+    if (req->args.len > 0) {  // Append URL parameters.
+      if (!sxg_write_string("\?", &url) ||
+          !buffer_write_str_t(&req->args, &url)) {
+        sxg_buffer_release(&url);
+        --ctx->subresources;
+        return NGX_ERROR;
+      }
+    }
+
+    // Search 'as' statement of original link header.
     ngx_str_t as = ngx_null_string;
     ngx_array_t* subresource_list = &ctx->subresource_list;
     ngx_subresource_t* subresource = subresource_list->elts;
@@ -296,14 +314,12 @@ static ngx_int_t subresource_fetch_handler(ngx_http_request_t* req, void* data,
       }
     }
 
-    if (as.len > 0 && sxg_write_string("<https://", &new_header_entry) &&
-        buffer_write_str_t(&cscf->server_name, &new_header_entry) &&
-        buffer_write_str_t(&req->uri, &new_header_entry) &&
+    if (as.len > 0 && sxg_write_string("<", &new_header_entry) &&
+        sxg_write_buffer(&url, &new_header_entry) &&
         sxg_write_string(">;rel=\"preload\";as=\"", &new_header_entry) &&
         buffer_write_str_t(&as, &new_header_entry) &&
-        sxg_write_string("\",<https://", &new_header_entry) &&
-        buffer_write_str_t(&cscf->server_name, &new_header_entry) &&
-        buffer_write_str_t(&req->uri, &new_header_entry) &&
+        sxg_write_string("\",<", &new_header_entry) &&
+        sxg_write_buffer(&url, &new_header_entry) &&
         sxg_write_string(">;rel=\"allowed-alt-sxg\";header-integrity=\"",
                          &new_header_entry) &&
         calc_integrity(req, &integrity) &&
@@ -312,7 +328,9 @@ static ngx_int_t subresource_fetch_handler(ngx_http_request_t* req, void* data,
       sxg_header_append_buffer("link", &new_header_entry,
                                &ctx->response.header);
     }
-
+    sxg_buffer_release(&url);
+    sxg_buffer_release(&integrity);
+    sxg_buffer_release(&new_header_entry);
     // Even if calculating subresource integrity failed, we ignore it.
     --ctx->subresources;
     return NGX_OK;
@@ -365,24 +383,24 @@ static size_t extract_preload_url_list(ngx_str_t* link, ngx_array_t* const dst,
           while (new_preload->url.data[new_preload->url.len - 1] == ' ') {
             new_preload->url.data[--new_preload->url.len] = '\0';
           }
-          if (as.data != NULL) {
-            new_preload->as = as;
-          }
         }
         found = true;
       }
       if (param_is_as(param, param_tail, (const char**)&as.data, &as.len)) {
-        if (found && new_preload != NULL) {
-          new_preload->as = as;
+        if (found) {
           ngx_log_error(
               NGX_LOG_DEBUG, r->connection->log, 0,
               "nginx-sxg-module: found as statement in link preload header: %V",
-              &new_preload->as);
+              &as);
         }
       }
       param += param_tail + 1;
     }
-    if (!found) {
+    if (found) {
+      if (new_preload != NULL) {
+        new_preload->as = as;
+      }
+    } else {
       if (non_preload_headers == NULL) {
         if (non_preload_headers_len > 0) {
           ++non_preload_headers_len;
@@ -420,6 +438,9 @@ static ngx_array_t* get_preload_list(ngx_str_t* link,
 
 static bool set_str(ngx_pool_t* pool, ngx_str_t* dst, const char* src) {
   const size_t len = strlen(src);
+  if (dst->data != NULL) {
+    ngx_pfree(pool, dst->data);
+  }
   dst->data = ngx_palloc(pool, len);
   if (dst->data == NULL) {
     return false;
