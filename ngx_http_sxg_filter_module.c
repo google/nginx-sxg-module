@@ -303,7 +303,7 @@ static ngx_str_t extract_angled_url(char* str, size_t len) {
   return (ngx_str_t){.data = NULL, .len = 0};
 }
 
-static void extract_preaload_url_list(ngx_str_t* link, ngx_array_t* const dst,
+static void extract_preload_url_list(ngx_str_t* link, ngx_array_t* const dst,
                                       ngx_http_request_t* r) {
   char* str = (char*)link->data;
   char* const end = str + link->len;
@@ -327,7 +327,7 @@ static void extract_preaload_url_list(ngx_str_t* link, ngx_array_t* const dst,
 
 static ngx_array_t* get_preload_list(ngx_str_t* link, ngx_http_request_t* req) {
   ngx_array_t* const urls = ngx_array_create(req->pool, 1, sizeof(ngx_str_t));
-  extract_preaload_url_list(link, urls, req);
+  extract_preload_url_list(link, urls, req);
   return urls;
 }
 
