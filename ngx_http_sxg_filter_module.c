@@ -447,16 +447,26 @@ static bool copy_buffer_to_sxg_buffer(const ngx_http_request_t* req,
   *last_buf = false;
   for (const ngx_chain_t* cl = in; cl != NULL; cl = cl->next) {
     if (cl->buf != NULL) {
-      if (cl->buf->in_file) {
-        const size_t copy_size = cl->buf->file_last - cl->buf->file_pos;
-        const size_t buffer_tail = buf->size;
-        if (buffer_tail + copy_size > limit) {
+      const size_t copy_size = ngx_buf_size(cl->buf);
+      if (buf->size + copy_size > limit) {
+        ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
+                      "nginx-sxg-module: too large buffer size required: "
+                      "%d bytes",
+                      buf->size + copy_size);
+        return false;
+      }
+
+      if (ngx_buf_in_memory(cl->buf)) {
+        if (!sxg_write_bytes(cl->buf->pos, copy_size, buf)) {
           ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                        "nginx-sxg-module: too large buffer size required "
+                        "nginx-sxg-module: failed to allocate SXG buffer: "
                         "%d bytes",
-                        buffer_tail + copy_size);
+                        copy_size);
           return false;
         }
+        cl->buf->pos = cl->buf->last; /* Consuming buffer */
+      } else if (cl->buf->in_file) {
+        const size_t buffer_tail = buf->size;
         sxg_buffer_resize(buf->size + copy_size, buf);
         const ssize_t copied_size =
             ngx_read_file(cl->buf->file, buf->data + buffer_tail, copy_size,
@@ -466,21 +476,7 @@ static bool copy_buffer_to_sxg_buffer(const ngx_http_request_t* req,
                         "nginx-sxg-module: failed to read buffer from file");
           return false;
         }
-      } else if (cl->buf->memory) {
-        const size_t copy_size = cl->buf->last - cl->buf->pos;
-        if (buf->size + copy_size > limit) {
-          ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                        "nginx-sxg-module: too large buffer size required: "
-                        "%d bytes",
-                        buf->size + copy_size);
-          return false;
-        } else if (!sxg_write_bytes(cl->buf->pos, copy_size, buf)) {
-          ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                        "nginx-sxg-module: failed to allocate SXG buffer: "
-                        "%d bytes",
-                        copy_size);
-        }
-        cl->buf->pos = cl->buf->last; /* Consuming buffer */
+        cl->buf->file_pos = cl->buf->file_last; /* Consuming buffer */
       }
       *last_buf |= cl->buf->last_buf;
     }
