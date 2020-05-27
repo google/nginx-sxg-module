@@ -403,9 +403,11 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
        part != NULL; part = part->next) {
     ngx_table_elt_t* value = part->elts;
     for (size_t i = 0; i < part->nelts; i++) {
-      if (value[i].key.len == strlen(kLinkKey) &&
-          ngx_memcmp(kLinkKey, value[i].key.data, strlen(kLinkKey)) == 0) {
-        invoke_subrequests(&value[i].value, req, ctx);
+      if (value[i].key.len == strlen(kLinkKey)) {
+        ngx_strlow(value[i].key.data, value[i].key.data, value[i].key.len);
+        if (ngx_memcmp(kLinkKey, value[i].key.data, strlen(kLinkKey)) == 0) {
+          invoke_subrequests(&value[i].value, req, ctx);
+        }
       }
     }
   }
