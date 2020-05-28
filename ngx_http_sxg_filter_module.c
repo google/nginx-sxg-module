@@ -41,11 +41,18 @@ typedef struct {
 } ngx_http_sxg_srv_conf_t;
 
 typedef struct {
+  ngx_str_t url;
+  ngx_str_t as;
+} ngx_subresource_t;
+
+typedef struct {
   int subresources;
   int main_resource_loaded;
   sxg_raw_response_t response;
   ngx_http_sxg_srv_conf_t* srv_conf;
   bool cert_chain_mode;
+  ngx_str_t link_header;
+  ngx_array_t subresource_list;
 } ngx_http_sxg_ctx_t;
 
 static ngx_http_output_header_filter_pt ngx_http_next_header_filter;
@@ -266,23 +273,64 @@ static ngx_int_t subresource_fetch_handler(ngx_http_request_t* req, void* data,
   if (req->done) {
     return NGX_OK;
   }
+  if (req->upstream->headers_in.status_n != 200) {
+    // Even if fetching subresource failed, we ignore it.
+    --ctx->subresources;
+    return NGX_OK;
+  }
+
   if (req->out->buf->last - req->out->buf->pos == req->upstream->length) {
     ngx_http_set_ctx(req, ctx, ngx_http_sxg_filter_module);
+    sxg_buffer_t url = sxg_empty_buffer();
+
+    // Set URL which includes headers and parameters.
+    if (!sxg_write_string("https://", &url) ||
+        !buffer_write_str_t(&cscf->server_name, &url) ||
+        !buffer_write_str_t(&req->uri, &url)) {
+      sxg_buffer_release(&url);
+      --ctx->subresources;
+      return NGX_ERROR;
+    }
+    if (req->args.len > 0) {  // Append URL parameters.
+      if (!sxg_write_string("\?", &url) ||
+          !buffer_write_str_t(&req->args, &url)) {
+        sxg_buffer_release(&url);
+        --ctx->subresources;
+        return NGX_ERROR;
+      }
+    }
+
+    // Search 'as' statement of original link header.
+    ngx_str_t as = ngx_null_string;
+    ngx_array_t* subresource_list = &ctx->subresource_list;
+    ngx_subresource_t* subresource = subresource_list->elts;
+    for (int i = 0; i < subresource_list->nelts; ++i) {
+      if (ngx_strncmp(subresource[i].url.data, req->uri.data,
+                      subresource[i].url.len) == 0) {
+        as = subresource[i].as;
+        break;
+      }
+    }
+
     sxg_buffer_t integrity = sxg_empty_buffer();
     sxg_buffer_t new_header_entry = sxg_empty_buffer();
-
-    if (calc_integrity(req, &integrity) &&
-        sxg_write_string("<https://", &new_header_entry) &&
-        buffer_write_str_t(&cscf->server_name, &new_header_entry) &&
-        buffer_write_str_t(&req->uri, &new_header_entry) &&
+    if (as.len > 0 && sxg_write_string("<", &new_header_entry) &&
+        sxg_write_buffer(&url, &new_header_entry) &&
+        sxg_write_string(">;rel=\"preload\";as=\"", &new_header_entry) &&
+        buffer_write_str_t(&as, &new_header_entry) &&
+        sxg_write_string("\",<", &new_header_entry) &&
+        sxg_write_buffer(&url, &new_header_entry) &&
         sxg_write_string(">;rel=\"allowed-alt-sxg\";header-integrity=\"",
                          &new_header_entry) &&
+        calc_integrity(req, &integrity) &&
         sxg_write_buffer(&integrity, &new_header_entry) &&
         sxg_write_string("\"", &new_header_entry)) {
       sxg_header_append_buffer("link", &new_header_entry,
                                &ctx->response.header);
     }
-
+    sxg_buffer_release(&url);
+    sxg_buffer_release(&integrity);
+    sxg_buffer_release(&new_header_entry);
     // Even if calculating subresource integrity failed, we ignore it.
     --ctx->subresources;
     return NGX_OK;
@@ -303,39 +351,137 @@ static ngx_str_t extract_angled_url(char* str, size_t len) {
   return (ngx_str_t){.data = NULL, .len = 0};
 }
 
-static void extract_preaload_url_list(ngx_str_t* link, ngx_array_t* const dst,
-                                      ngx_http_request_t* r) {
+// TODO(kumagi): Complex logic should be migrated to ngx_sxg_utils.c.
+// Extracts URL list `dst` from `link` like </foo.js>;rel="preload";as="script"
+// Returns length of non-preload header string.
+// If `dst` is NULL, it does nothing than calculates and returns the required
+// length for `non_preload_headers`.
+static size_t extract_preload_url_list(ngx_str_t* link, ngx_array_t* const dst,
+                                       ngx_str_t* non_preload_headers,
+                                       ngx_http_request_t* r) {
   char* str = (char*)link->data;
-  char* const end = str + link->len;
+  char* end = str + link->len;
+  size_t non_preload_headers_len = 0;
   while (str < end) {
     const size_t tail = get_term_length(str, end - str, ',', "<>");
     ngx_str_t url = extract_angled_url(str, tail);
     char* param = str;
+    bool found = false;
+    ngx_subresource_t* new_preload = NULL;
+    ngx_str_t as = ngx_null_string;
+
     while (param < str + tail) {
+      while (*param == ' ' || *param == '\t') {
+        ++param;
+      }
       const size_t rest = str + tail - param;
       size_t param_tail = get_term_length(param, rest, ';', "<>");
+      ngx_str_t param_s = {param_tail, param};
+      ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
+                    "nginx-sxg-module: param is: [%V]", &param_s);
+
       if (param_is_preload(param, param_tail)) {
-        ngx_str_t* const new_url = ngx_array_push(dst);
-        *new_url = url;
-        break;
+        if (dst != NULL) {
+          new_preload = ngx_array_push(dst);
+          new_preload->url.data = ngx_palloc(r->pool, url.len);
+          new_preload->url.len = url.len;
+          ngx_memcpy(new_preload->url.data, url.data, url.len);
+          while (new_preload->url.data[new_preload->url.len - 1] == ' ') {
+            new_preload->url.data[--new_preload->url.len] = '\0';
+          }
+        }
+        found = true;
+      }
+
+      if (param_is_as(param, param_tail, (const char**)&as.data, &as.len)) {
+        if (found) {
+          ngx_log_error(
+              NGX_LOG_DEBUG, r->connection->log, 0,
+              "nginx-sxg-module: found as statement in link preload header: %V",
+              &as);
+        }
       }
       param += param_tail + 1;
     }
+    if (found) {
+      if (new_preload != NULL) {
+        new_preload->as = as;
+      }
+    } else {
+      if (non_preload_headers == NULL) {
+        if (non_preload_headers_len > 0) {
+          ++non_preload_headers_len;
+        }
+      } else {
+        if (non_preload_headers_len > 0) {
+          ngx_memcpy(non_preload_headers->data + non_preload_headers_len, ",",
+                     1);
+          ++non_preload_headers_len;
+        }
+        ngx_memcpy(non_preload_headers->data + non_preload_headers_len, str,
+                   tail);
+      }
+      non_preload_headers_len += tail;
+    }
     str += tail + 1;
   }
+
+  return non_preload_headers_len;
 }
 
-static ngx_array_t* get_preload_list(ngx_str_t* link, ngx_http_request_t* req) {
-  ngx_array_t* const urls = ngx_array_create(req->pool, 1, sizeof(ngx_str_t));
-  extract_preaload_url_list(link, urls, req);
+static ngx_array_t* get_preload_list(ngx_str_t* link,
+                                     ngx_str_t* non_preload_headers,
+                                     ngx_http_request_t* req) {
+  ngx_array_t* const urls =
+      ngx_array_create(req->pool, 1, sizeof(ngx_subresource_t));
+  size_t non_preload_headers_len =
+      extract_preload_url_list(link, NULL, NULL, req);
+  non_preload_headers->data = ngx_palloc(req->pool, non_preload_headers_len);
+  non_preload_headers->len = non_preload_headers_len;
+  extract_preload_url_list(link, urls, non_preload_headers, req);
+  ngx_log_error(NGX_LOG_DEBUG, req->connection->log, 0,
+                "nginx-sxg-module: non preload header: %V",
+                non_preload_headers);
   return urls;
+}
+
+static bool set_str(ngx_pool_t* pool, ngx_str_t* dst, const char* src) {
+  const size_t len = strlen(src);
+  if (dst->data != NULL) {
+    ngx_pfree(pool, dst->data);
+  }
+  dst->data = ngx_palloc(pool, len);
+  if (dst->data == NULL) {
+    return false;
+  }
+  dst->len = len;
+  memcpy(dst->data, src, len);
+  return true;
+}
+
+static bool set_accept_headers(ngx_http_request_t* req, const char* accept) {
+  const static char* kAccept = "accept";
+  ngx_list_part_t* part = &req->headers_in.headers.part;
+  ngx_table_elt_t* v = part->elts;
+
+  for (int i = 0; i < part->nelts; i++) {
+    if (strncasecmp(kAccept, (const char*)v[i].key.data, strlen(kAccept)) ==
+            0 &&
+        !set_str(req->pool, &v[i].value, accept)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 static bool invoke_subrequests(ngx_str_t* link, ngx_http_request_t* req,
                                ngx_http_sxg_ctx_t* ctx) {
-  ngx_array_t* urls = get_preload_list(link, req);
-  ngx_str_t* entry = urls->elts;
+  ngx_array_t* urls = get_preload_list(link, &ctx->link_header, req);
+  ngx_subresource_t* entry = urls->elts;
 
+  if (!set_accept_headers(req, "*/*")) {
+    return false;
+  }
   for (size_t i = 0; i < urls->nelts; ++i) {
     ngx_http_request_t* sr = NULL;
     ngx_http_post_subrequest_t* psr =
@@ -345,9 +491,11 @@ static bool invoke_subrequests(ngx_str_t* link, ngx_http_request_t* req,
     }
     psr->handler = subresource_fetch_handler;
     psr->data = ctx;
+    ngx_log_error(NGX_LOG_DEBUG, req->connection->log, 0,
+                  "invoke request for: %V as %V", &entry[i].url, &entry[i].as);
 
     ngx_int_t rc = ngx_http_subrequest(
-        req, &entry[i], NULL, &sr, psr,
+        req, &entry[i].url, NULL, &sr, psr,
         NGX_HTTP_SUBREQUEST_WAITED | NGX_HTTP_SUBREQUEST_IN_MEMORY);
     if (rc == NGX_OK) {
       ++ctx->subresources;
@@ -355,6 +503,7 @@ static bool invoke_subrequests(ngx_str_t* link, ngx_http_request_t* req,
       return false;
     }
   }
+  ctx->subresource_list = *urls;
   return true;
 }
 
@@ -399,6 +548,7 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
 
   // Set headers.
   static const char kLinkKey[] = "link";
+  ngx_str_null(&ctx->link_header);
   for (const ngx_list_part_t* part = &req->headers_out.headers.part;
        part != NULL; part = part->next) {
     ngx_table_elt_t* value = part->elts;
@@ -406,6 +556,10 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
       if (value[i].key.len == strlen(kLinkKey) &&
           ngx_strcasecmp((u_char*)kLinkKey, value[i].key.data) == 0) {
         invoke_subrequests(&value[i].value, req, ctx);
+
+        // Replace outer link header.
+        // TODO(kumagi): Support a case that there are multiple Link headers.
+        value[i].value = ctx->link_header;
       }
     }
   }
@@ -478,6 +632,8 @@ static bool copy_buffer_to_sxg_buffer(const ngx_http_request_t* req,
         }
         cl->buf->file_pos = cl->buf->file_last; /* Consuming buffer */
       }
+      ngx_log_error(NGX_LOG_DEBUG, req->connection->log, 0,
+                    "nginx-sxg-module: now sxg buffer is %d bytes", buf->size);
       *last_buf |= cl->buf->last_buf;
     }
   }
@@ -717,7 +873,6 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
                               &nscf->signers)) {
       ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                     "nginx-sxg-module: failed to allocate memory");
-
       return NGX_ERROR;
     }
     if (nscf->cert_path.len > 0 &&

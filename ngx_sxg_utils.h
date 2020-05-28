@@ -54,6 +54,11 @@ bool highest_qvalue_is_sxg(const char* param, size_t len);
 // e.g. rel="foo preload bar" -> true
 bool param_is_preload(const char* param, size_t len);
 
+// Detects as="*" parameter in HTTP link header.
+// e.g. as="image" -> true
+bool param_is_as(const char* param, size_t len, const char** value,
+                 size_t* value_len);
+
 // Loads and create EVP_PKEY struct from private key filepath.
 EVP_PKEY* load_private_key(const char* filepath);
 
