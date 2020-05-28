@@ -404,7 +404,7 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
     ngx_table_elt_t* value = part->elts;
     for (size_t i = 0; i < part->nelts; i++) {
       if (value[i].key.len == strlen(kLinkKey) &&
-          ngx_memcmp(kLinkKey, value[i].key.data, strlen(kLinkKey)) == 0) {
+          ngx_strcasecmp((u_char*)kLinkKey, value[i].key.data) == 0) {
         invoke_subrequests(&value[i].value, req, ctx);
       }
     }
