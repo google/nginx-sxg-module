@@ -93,7 +93,7 @@ TEST(NgxSxgUtilsTest, ParamIsPreload) {
   EXPECT_FALSE(ParamIsPreload("rel=prepreload"));
 
   // TODO: we should support this pattern.
-  // EXPECT_TRUE(ParamIsPreload("rel= preload"));
+  // EXPECT_TRUE(ParamIsPreload("rel =preload"));
 }
 
 TEST(NgxSxgCertChain, free) {

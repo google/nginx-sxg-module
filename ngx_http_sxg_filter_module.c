@@ -282,8 +282,6 @@ static ngx_int_t subresource_fetch_handler(ngx_http_request_t* req, void* data,
   if (req->out->buf->last - req->out->buf->pos == req->upstream->length) {
     ngx_http_set_ctx(req, ctx, ngx_http_sxg_filter_module);
     sxg_buffer_t url = sxg_empty_buffer();
-    sxg_buffer_t integrity = sxg_empty_buffer();
-    sxg_buffer_t new_header_entry = sxg_empty_buffer();
 
     // Set URL which includes headers and parameters.
     if (!sxg_write_string("https://", &url) ||
@@ -314,6 +312,8 @@ static ngx_int_t subresource_fetch_handler(ngx_http_request_t* req, void* data,
       }
     }
 
+    sxg_buffer_t integrity = sxg_empty_buffer();
+    sxg_buffer_t new_header_entry = sxg_empty_buffer();
     if (as.len > 0 && sxg_write_string("<", &new_header_entry) &&
         sxg_write_buffer(&url, &new_header_entry) &&
         sxg_write_string(">;rel=\"preload\";as=\"", &new_header_entry) &&
@@ -459,8 +459,7 @@ static bool set_str(ngx_pool_t* pool, ngx_str_t* dst, const char* src) {
   return true;
 }
 
-static bool set_accept_headers(ngx_http_request_t* req,
-                               ngx_subresource_t* target, const char* accept) {
+static bool set_accept_headers(ngx_http_request_t* req, const char* accept) {
   const static char* kAccept = "accept";
   ngx_list_part_t* part = &req->headers_in.headers.part;
   ngx_table_elt_t* v = part->elts;
@@ -480,6 +479,9 @@ static bool invoke_subrequests(ngx_str_t* link, ngx_http_request_t* req,
   ngx_array_t* urls = get_preload_list(link, &ctx->link_header, req);
   ngx_subresource_t* entry = urls->elts;
 
+  if (!set_accept_headers(req, "*/*")) {
+    return false;
+  }
   for (size_t i = 0; i < urls->nelts; ++i) {
     ngx_http_request_t* sr = NULL;
     ngx_http_post_subrequest_t* psr =
@@ -491,10 +493,6 @@ static bool invoke_subrequests(ngx_str_t* link, ngx_http_request_t* req,
     psr->data = ctx;
     ngx_log_error(NGX_LOG_DEBUG, req->connection->log, 0,
                   "invoke request for: %V as %V", &entry[i].url, &entry[i].as);
-
-    if (!set_accept_headers(req, &entry[i], "*/*")) {
-      return false;
-    }
 
     ngx_int_t rc = ngx_http_subrequest(
         req, &entry[i].url, NULL, &sr, psr,
