@@ -17,6 +17,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <pthread.h>
 #include <stdbool.h>
 
 #include "libsxg.h"
@@ -53,6 +54,8 @@ typedef struct {
   bool cert_chain_mode;
   ngx_str_t link_header;
   ngx_array_t subresource_list;
+
+  pthread_mutex_t lock;
 } ngx_http_sxg_ctx_t;
 
 static ngx_http_output_header_filter_pt ngx_http_next_header_filter;
@@ -64,6 +67,12 @@ static char* ngx_http_sxg_merge_srv_conf(ngx_conf_t* cf, void* parent,
                                          void* child);
 static char* ngx_conf_set_cert_chain(ngx_conf_t* cf, ngx_command_t* cmd,
                                      void* conf);
+static ngx_int_t subresource_fetch_handler_impl(ngx_http_request_t* req,
+                                                ngx_http_core_srv_conf_t* cscf,
+                                                ngx_http_sxg_ctx_t* ctx);
+static ngx_int_t ngx_http_sxg_body_filter_impl(ngx_http_request_t* req,
+                                               ngx_http_sxg_ctx_t* ctx,
+                                               ngx_chain_t* in);
 
 static ngx_command_t ngx_http_sxg_commands[] = {
     {ngx_string("sxg"), NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_FLAG,
@@ -267,18 +276,28 @@ static bool calc_integrity(const ngx_http_request_t* const req,
 
 static ngx_int_t subresource_fetch_handler(ngx_http_request_t* req, void* data,
                                            ngx_int_t rc) {
-  ngx_http_sxg_ctx_t* ctx = data;
-  ngx_http_core_srv_conf_t* cscf =
-      ngx_http_get_module_srv_conf(req, ngx_http_core_module);
   if (req->done) {
     return NGX_OK;
   }
-  if (req->upstream->headers_in.status_n != 200) {
+  ngx_http_core_srv_conf_t* cscf =
+      ngx_http_get_module_srv_conf(req, ngx_http_core_module);
+  ngx_http_sxg_ctx_t* ctx = data;
+
+  pthread_mutex_lock(&ctx->lock);
+  ngx_int_t result = subresource_fetch_handler_impl(req, cscf, ctx);
+  pthread_mutex_unlock(&ctx->lock);
+
+  return result;
+}
+
+static ngx_int_t subresource_fetch_handler_impl(ngx_http_request_t* req,
+                                                ngx_http_core_srv_conf_t* cscf,
+                                                ngx_http_sxg_ctx_t* ctx) {
+  if (req->upstream == NULL || req->upstream->headers_in.status_n != 200) {
     // Even if fetching subresource failed, we ignore it.
     --ctx->subresources;
     return NGX_OK;
   }
-
   if (req->out->buf->last - req->out->buf->pos == req->upstream->length) {
     ngx_http_set_ctx(req, ctx, ngx_http_sxg_filter_module);
     sxg_buffer_t url = sxg_empty_buffer();
@@ -537,14 +556,19 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
     if (ctx == NULL) {
       return NGX_ERROR;
     }
+
+    if (pthread_mutex_init(&ctx->lock, NULL) != 0) {
+      return NGX_ERROR;
+    }
     ctx->response = sxg_empty_raw_response();
     ctx->main_resource_loaded = false;
     ngx_http_set_ctx(req, ctx, ngx_http_sxg_filter_module);
   }
-
   if (req->parent != NULL) {
     return ngx_http_next_header_filter(req);
   }
+
+  pthread_mutex_lock(&ctx->lock);
 
   // Set headers.
   static const char kLinkKey[] = "link";
@@ -564,8 +588,10 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
     }
   }
 
-  return ctx->subresources == 0 ? NGX_OK :  // No more subresources.
-             NGX_AGAIN;                     // There are more subresources.
+  ngx_int_t ret = ctx->subresources == 0 ? NGX_OK :  // No more subresources.
+                      NGX_AGAIN;  // There are more subresources.
+  pthread_mutex_unlock(&ctx->lock);
+  return ret;
 }
 
 static char* construct_fallback_url(const ngx_http_request_t* req) {
@@ -663,15 +689,28 @@ static bool make_chain_from_buffer(ngx_http_request_t* req,
 
 static ngx_int_t ngx_http_sxg_body_filter(ngx_http_request_t* req,
                                           ngx_chain_t* in) {
-  ngx_http_sxg_srv_conf_t* ssc =
-      ngx_http_get_module_srv_conf(req, ngx_http_sxg_filter_module);
   ngx_http_sxg_ctx_t* ctx =
       ngx_http_get_module_ctx(req, ngx_http_sxg_filter_module);
 
-  if (ctx == NULL || req->done || req->header_sent) {
+  if (ctx == NULL) {
     return ngx_http_next_body_filter(req, in);
   }
 
+  pthread_mutex_lock(&ctx->lock);
+  ngx_int_t result = ngx_http_sxg_body_filter_impl(req, ctx, in);
+  pthread_mutex_unlock(&ctx->lock);
+  return result;
+}
+
+static ngx_int_t ngx_http_sxg_body_filter_impl(ngx_http_request_t* req,
+                                               ngx_http_sxg_ctx_t* ctx,
+                                               ngx_chain_t* in) {
+  ngx_http_sxg_srv_conf_t* ssc =
+      ngx_http_get_module_srv_conf(req, ngx_http_sxg_filter_module);
+
+  if (req->done || req->header_sent) {
+    return ngx_http_next_body_filter(req, in);
+  }
   if (!ctx->main_resource_loaded) {
     bool lastbuf_included = false;
     if (copy_buffer_to_sxg_buffer(req, in, &ctx->response.payload,
