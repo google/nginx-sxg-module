@@ -249,8 +249,11 @@ bool param_is_as(const char* param, size_t len, const char** value,
     if (end == NULL) {
       return false;
     }
-    *value = param + 1;
-    *value_len = end - param - 1;
+    param += 1;
+    size_t len = end - param;
+    strip(&param, &len);
+    *value = param;
+    *value_len = len;
   } else {
     *value = param;
     *value_len = len;
