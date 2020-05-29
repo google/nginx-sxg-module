@@ -304,7 +304,7 @@ static ngx_int_t subresource_fetch_handler(ngx_http_request_t* req, void* data,
     ngx_str_t as = ngx_null_string;
     ngx_array_t* subresource_list = &ctx->subresource_list;
     ngx_subresource_t* subresource = subresource_list->elts;
-    for (int i = 0; i < subresource_list->nelts; ++i) {
+    for (size_t i = 0; i < subresource_list->nelts; ++i) {
       if (ngx_strncmp(subresource[i].url.data, req->uri.data,
                       subresource[i].url.len) == 0) {
         as = subresource[i].as;
@@ -376,7 +376,7 @@ static size_t extract_preload_url_list(ngx_str_t* link, ngx_array_t* const dst,
       }
       const size_t rest = str + tail - param;
       size_t param_tail = get_term_length(param, rest, ';', "<>");
-      ngx_str_t param_s = {param_tail, param};
+      ngx_str_t param_s = {param_tail, (u_char*)param};
       ngx_log_error(NGX_LOG_DEBUG, r->connection->log, 0,
                     "nginx-sxg-module: param is: [%V]", &param_s);
 
@@ -460,11 +460,11 @@ static bool set_str(ngx_pool_t* pool, ngx_str_t* dst, const char* src) {
 }
 
 static bool set_accept_headers(ngx_http_request_t* req, const char* accept) {
-  const static char* kAccept = "accept";
+  static const char* kAccept = "accept";
   ngx_list_part_t* part = &req->headers_in.headers.part;
   ngx_table_elt_t* v = part->elts;
 
-  for (int i = 0; i < part->nelts; i++) {
+  for (size_t i = 0; i < part->nelts; i++) {
     if (strncasecmp(kAccept, (const char*)v[i].key.data, strlen(kAccept)) ==
             0 &&
         !set_str(req->pool, &v[i].value, accept)) {
