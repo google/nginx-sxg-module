@@ -17,6 +17,7 @@
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include <pthread.h>
 #include <stdbool.h>
 
 #include "libsxg.h"
@@ -45,6 +46,9 @@ typedef struct {
   ngx_str_t as;
 } ngx_subresource_t;
 
+// A context structure which is allcated for every single client request.
+// This structure will be concurrently accessed to handle multiple subrequest
+// handling.
 typedef struct {
   int subresources;
   int main_resource_loaded;
@@ -53,6 +57,9 @@ typedef struct {
   bool cert_chain_mode;
   ngx_str_t link_header;
   ngx_array_t subresource_list;
+
+  // On accessing member, first you should get this lock.
+  pthread_mutex_t lock;
 } ngx_http_sxg_ctx_t;
 
 static ngx_http_output_header_filter_pt ngx_http_next_header_filter;
@@ -64,6 +71,12 @@ static char* ngx_http_sxg_merge_srv_conf(ngx_conf_t* cf, void* parent,
                                          void* child);
 static char* ngx_conf_set_cert_chain(ngx_conf_t* cf, ngx_command_t* cmd,
                                      void* conf);
+static ngx_int_t subresource_fetch_handler_impl(ngx_http_request_t* req,
+                                                ngx_http_core_srv_conf_t* cscf,
+                                                ngx_http_sxg_ctx_t* ctx);
+static ngx_int_t ngx_http_sxg_body_filter_impl(ngx_http_request_t* req,
+                                               ngx_http_sxg_ctx_t* ctx,
+                                               ngx_chain_t* in);
 
 static ngx_command_t ngx_http_sxg_commands[] = {
     {ngx_string("sxg"), NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_FLAG,
@@ -206,6 +219,11 @@ static bool generate_sxg(const ngx_http_request_t* req,
   return success;
 }
 
+static void release_ctx(ngx_pool_t* pool, ngx_http_sxg_ctx_t* ctx) {
+  sxg_raw_response_release(&ctx->response);
+  pthread_mutex_destroy(&ctx->lock);
+}
+
 static bool buffer_write_str_t(const ngx_str_t* str, sxg_buffer_t* target) {
   return sxg_write_bytes(str->data, str->len, target);
 }
@@ -267,18 +285,35 @@ static bool calc_integrity(const ngx_http_request_t* const req,
 
 static ngx_int_t subresource_fetch_handler(ngx_http_request_t* req, void* data,
                                            ngx_int_t rc) {
-  ngx_http_sxg_ctx_t* ctx = data;
-  ngx_http_core_srv_conf_t* cscf =
-      ngx_http_get_module_srv_conf(req, ngx_http_core_module);
   if (req->done) {
     return NGX_OK;
   }
-  if (req->upstream->headers_in.status_n != 200) {
+  ngx_http_core_srv_conf_t* cscf =
+      ngx_http_get_module_srv_conf(req, ngx_http_core_module);
+  ngx_http_sxg_ctx_t* ctx = data;
+
+  if (ctx == NULL) {
+    return NGX_OK;
+  }
+  if (pthread_mutex_lock(&ctx->lock) != 0) {
+    return NGX_ERROR;
+  }
+  ngx_int_t result = subresource_fetch_handler_impl(req, cscf, ctx);
+  if (pthread_mutex_unlock(&ctx->lock) != 0) {
+    return NGX_ERROR;
+  }
+
+  return result;
+}
+
+static ngx_int_t subresource_fetch_handler_impl(ngx_http_request_t* req,
+                                                ngx_http_core_srv_conf_t* cscf,
+                                                ngx_http_sxg_ctx_t* ctx) {
+  if (req->upstream == NULL || req->upstream->headers_in.status_n != 200) {
     // Even if fetching subresource failed, we ignore it.
     --ctx->subresources;
     return NGX_OK;
   }
-
   if (req->out->buf->last - req->out->buf->pos == req->upstream->length) {
     ngx_http_set_ctx(req, ctx, ngx_http_sxg_filter_module);
     sxg_buffer_t url = sxg_empty_buffer();
@@ -492,11 +527,13 @@ static bool invoke_subrequests(ngx_str_t* link, ngx_http_request_t* req,
     psr->handler = subresource_fetch_handler;
     psr->data = ctx;
     ngx_log_error(NGX_LOG_DEBUG, req->connection->log, 0,
-                  "invoke request for: %V as %V", &entry[i].url, &entry[i].as);
+                  "nginx-sxg-module: invoke request for: %V as %V",
+                  &entry[i].url, &entry[i].as);
 
     ngx_int_t rc = ngx_http_subrequest(
         req, &entry[i].url, NULL, &sr, psr,
         NGX_HTTP_SUBREQUEST_WAITED | NGX_HTTP_SUBREQUEST_IN_MEMORY);
+
     if (rc == NGX_OK) {
       ++ctx->subresources;
     } else {
@@ -526,7 +563,7 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
 
   if (!ssc->enable || !response_should_be_sxg(req) || req->header_only ||
       (req->method & NGX_HTTP_HEAD) || req != req->main ||
-      req->headers_out.status == NGX_HTTP_NO_CONTENT) {
+      req->headers_out.status == NGX_HTTP_NO_CONTENT || req->parent != NULL) {
     return ngx_http_next_header_filter(req);
   }
 
@@ -537,13 +574,17 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
     if (ctx == NULL) {
       return NGX_ERROR;
     }
+
+    if (pthread_mutex_init(&ctx->lock, NULL) != 0) {
+      return NGX_ERROR;
+    }
     ctx->response = sxg_empty_raw_response();
     ctx->main_resource_loaded = false;
     ngx_http_set_ctx(req, ctx, ngx_http_sxg_filter_module);
   }
 
-  if (req->parent != NULL) {
-    return ngx_http_next_header_filter(req);
+  if (pthread_mutex_lock(&ctx->lock) != 0) {
+    return NGX_ERROR;
   }
 
   // Set headers.
@@ -564,8 +605,12 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
     }
   }
 
-  return ctx->subresources == 0 ? NGX_OK :  // No more subresources.
-             NGX_AGAIN;                     // There are more subresources.
+  ngx_int_t ret = ctx->subresources == 0 ? NGX_OK :  // No more subresources.
+                      NGX_AGAIN;  // There are more subresources.
+  if (pthread_mutex_unlock(&ctx->lock) != 0) {
+    return NGX_ERROR;
+  }
+  return ret;
 }
 
 static char* construct_fallback_url(const ngx_http_request_t* req) {
@@ -663,15 +708,42 @@ static bool make_chain_from_buffer(ngx_http_request_t* req,
 
 static ngx_int_t ngx_http_sxg_body_filter(ngx_http_request_t* req,
                                           ngx_chain_t* in) {
-  ngx_http_sxg_srv_conf_t* ssc =
-      ngx_http_get_module_srv_conf(req, ngx_http_sxg_filter_module);
   ngx_http_sxg_ctx_t* ctx =
       ngx_http_get_module_ctx(req, ngx_http_sxg_filter_module);
 
-  if (ctx == NULL || req->done || req->header_sent) {
+  if (ctx == NULL || req->done == true) {
     return ngx_http_next_body_filter(req, in);
   }
 
+  if (pthread_mutex_lock(&ctx->lock) != 0) {
+    return NGX_ERROR;
+  }
+  ngx_int_t result = ngx_http_sxg_body_filter_impl(req, ctx, in);
+
+  if (pthread_mutex_unlock(&ctx->lock) != 0) {
+    return NGX_ERROR;
+  }
+
+  if (result == NGX_OK || result == NGX_ERROR) {
+    if (result == NGX_ERROR) {
+      ngx_log_error(NGX_LOG_DEBUG, req->connection->log, 0,
+                    "nginx-sxg-module: finalizing SXG request context");
+    }
+    release_ctx(req->pool, ctx);
+  }
+
+  return result;
+}
+
+static ngx_int_t ngx_http_sxg_body_filter_impl(ngx_http_request_t* req,
+                                               ngx_http_sxg_ctx_t* ctx,
+                                               ngx_chain_t* in) {
+  ngx_http_sxg_srv_conf_t* ssc =
+      ngx_http_get_module_srv_conf(req, ngx_http_sxg_filter_module);
+
+  if (req->header_sent) {
+    return ngx_http_next_body_filter(req, in);
+  }
   if (!ctx->main_resource_loaded) {
     bool lastbuf_included = false;
     if (copy_buffer_to_sxg_buffer(req, in, &ctx->response.payload,
