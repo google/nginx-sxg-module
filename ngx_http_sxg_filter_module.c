@@ -46,7 +46,7 @@ typedef struct {
   ngx_str_t as;
 } ngx_subresource_t;
 
-// A context structure which is allcated for every single client request.
+// A context structure which is allocated for every single client request.
 // This structure will be concurrently accessed to handle multiple subrequest
 // handling.
 typedef struct {
