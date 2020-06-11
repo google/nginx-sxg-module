@@ -14,6 +14,11 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
+// Run with:
+// clang -g -O1 -Lbuild -lngx_sxg_utils -fsanitize=fuzzer,address,undefined \
+//   get_term_length_fuzzer.cc &&
+//   LD_LIBRARY_PATH=build ./a.out -dict=get_term_length_dict.txt
+
 #include "ngx_sxg_utils.h"
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
