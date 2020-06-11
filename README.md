@@ -6,9 +6,11 @@ Signed HTTP Exchange (SXG) support for nginx. Nginx will convert responses from
 the upstream application into SXG when client requests include the `Accept:
 application/signed-exchane;v=b3` HTTP header with highest qvalue.
 
-## Prerequisite
+## Installation
 
-You have to install `libsxg` binary into your system. You can get it from [here](https://github.com/google/libsxg/releases).
+There are two options for installation: Debian package or build from source. See
+[this article](https://web.dev/how-to-set-up-signed-http-exchanges/) for more
+details.
 
 ## Configuration
 
