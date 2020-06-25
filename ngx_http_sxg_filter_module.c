@@ -25,7 +25,7 @@
 
 #ifdef BLAZE
 #include "third_party/openssl/pem.h"
-#elseif
+#else
 #include "openssl/pem.h"
 #endif
 
