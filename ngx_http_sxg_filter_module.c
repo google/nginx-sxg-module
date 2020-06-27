@@ -69,8 +69,6 @@ static void* ngx_http_sxg_create_srv_conf(ngx_conf_t* cf);
 static char* construct_fallback_url(const ngx_http_request_t* r);
 static char* ngx_http_sxg_merge_srv_conf(ngx_conf_t* cf, void* parent,
                                          void* child);
-static char* ngx_conf_set_cert_chain(ngx_conf_t* cf, ngx_command_t* cmd,
-                                     void* conf);
 static ngx_int_t subresource_fetch_handler_impl(ngx_http_request_t* req,
                                                 ngx_http_core_srv_conf_t* cscf,
                                                 ngx_http_sxg_ctx_t* ctx);
@@ -104,7 +102,7 @@ static ngx_command_t ngx_http_sxg_commands[] = {
      offsetof(ngx_http_sxg_srv_conf_t, validity_url), NULL},
     {ngx_string("sxg_cert_path"),
      NGX_HTTP_SRV_CONF | NGX_HTTP_LOC_CONF | NGX_CONF_TAKE1,
-     ngx_conf_set_cert_chain, NGX_HTTP_SRV_CONF_OFFSET,
+     ngx_conf_set_str_slot, NGX_HTTP_SRV_CONF_OFFSET,
      offsetof(ngx_http_sxg_srv_conf_t, cert_path), NULL},
     ngx_null_command};
 
@@ -887,17 +885,6 @@ static ngx_int_t ngx_http_cert_chain_handler(ngx_http_request_t* req) {
     return NGX_ERROR;
   }
   return NGX_DONE;
-}
-
-static char* ngx_conf_set_cert_chain(ngx_conf_t* cf, ngx_command_t* cmd,
-                                     void* conf) {
-  ngx_http_sxg_srv_conf_t* ssc = conf;
-  ngx_str_t* args = cf->args->elts;
-  if (ssc->cert_path.data != NULL) {
-    return "is duplicate";
-  }
-  ssc->cert_path = args[1];
-  return NGX_CONF_OK;
 }
 
 static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf) {
