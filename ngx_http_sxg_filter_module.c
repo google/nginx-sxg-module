@@ -771,13 +771,13 @@ static ngx_int_t ngx_http_sxg_body_filter_impl(ngx_http_request_t* req,
     return NGX_ERROR;
   }
 
-  ngx_str_t* content_type = &req->headers_out.content_type;
-  sxg_header_append_string("content-type", (const char*)content_type->data,
+  sxg_header_append_string("content-type",
+                           (const char*)req->headers_out.content_type->data,
                            &ctx->response.header);
-
   static const char kSxgContentType[] = "application/signed-exchange;v=b3";
-  content_type->data = (u_char*)kSxgContentType;  // must be SXG
-  content_type->len = strlen(kSxgContentType);
+  ngx_str_set(&req->headers_out.content_type, kSxgContentType);  // must be SXG
+  req->headers_out.content_type_len = req->headers_out.content_type.len;
+  req->headers_out.content_type_lowcase = NULL;
 
   sxg_buffer_t sxg = sxg_empty_buffer();
   bool success = generate_sxg(req, ctx, &sxg);
@@ -835,21 +835,6 @@ static bool is_valid_config(ngx_conf_t* nc, const ngx_http_sxg_srv_conf_t* sc) {
   return valid;
 }
 
-static bool append_header(ngx_list_t* headers, const char* key,
-                          const char* value) {
-  ngx_table_elt_t* h = ngx_list_push(headers);
-  if (h == NULL) {
-    return false;
-  }
-
-  h->hash = 1;
-  h->key.len = strlen(key);
-  h->key.data = (u_char*)key;
-  h->value.len = strlen(value);
-  h->value.data = (u_char*)value;
-  return true;
-}
-
 static ngx_int_t ngx_http_cert_chain_handler(ngx_http_request_t* req) {
   // Check the URL is a certificate request.
   ngx_http_sxg_srv_conf_t* ssc =
@@ -868,10 +853,9 @@ static ngx_int_t ngx_http_cert_chain_handler(ngx_http_request_t* req) {
   req->headers_out.content_length_n =
       ssc->cert_chain.serialized_cert_chain.size;
 
-  if (!append_header(&req->headers_out.headers, "Content-Type",
-                     "application/cert-chain+cbor")) {
-    return NGX_HTTP_INTERNAL_SERVER_ERROR;
-  }
+  ngx_str_set(&req->headers_out.content_type, "application/cert-chain+cbor");
+  req->headers_out.content_type_len = req->headers_out.content_type.len;
+  req->headers_out.content_type_lowcase = NULL;
 
   ngx_chain_t* out;
   if (!make_chain_from_buffer(req, &ssc->cert_chain.serialized_cert_chain,
