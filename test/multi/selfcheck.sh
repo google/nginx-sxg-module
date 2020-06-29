@@ -17,4 +17,4 @@ chmod -R 755 /data/result
 
 cat result/index.sxg
 cat result/error.log
-#cat /etc/nginx/nginx.conf
+
