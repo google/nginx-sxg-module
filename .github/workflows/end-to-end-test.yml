@@ -45,6 +45,10 @@ jobs:
           cat test/out/error.log
           cat test/out/index.sxg
 
+      - name: check output
+        run: |
+          [[ "$(comm -2 test/out/index.headers expected.headers) == "" ]]
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v1
         with:

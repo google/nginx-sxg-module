@@ -642,7 +642,7 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
     return NGX_ERROR;
   }
 
-  // Set headers.
+  // Search link header and invoke subrequests.
   static const char kLinkKey[] = "link";
   ngx_str_null(&ctx->link_header);
   for (const ngx_list_part_t* part = &req->headers_out.headers.part;
@@ -653,7 +653,7 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
           ngx_strcasecmp((u_char*)kLinkKey, value[i].key.data) == 0) {
         invoke_subrequests(&value[i].value, req, ctx);
 
-        // Replace outer link header.
+        // Replace outer link header with non-preload headers.
         // TODO(kumagi): Support a case that there are multiple Link headers.
         value[i].value = ctx->link_header;
       }
@@ -819,20 +819,39 @@ static ngx_int_t ngx_http_sxg_body_filter_impl(ngx_http_request_t* req,
     return NGX_AGAIN;
   }
 
-  // Copy SXG headers to innerHTML header
-  if (!copy_response_header_to_sxg_header(req->pool, &req->headers_out.headers,
+  // Copy SXG headers to innerHTML header.
+  if (!sxg_header_append_string("content-type",
+                                (const char*)req->headers_out.content_type.data,
+                                &ctx->response.header) ||
+      !copy_response_header_to_sxg_header(req->pool, &req->headers_out.headers,
                                           &ctx->response.header)) {
+    ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
+                  "nginx-sxg-module: failed to copy headers to SXG");
     sxg_raw_response_release(&ctx->response);
     return NGX_ERROR;
   }
 
-  sxg_header_append_string("content-type",
-                           (const char*)req->headers_out.content_type.data,
-                           &ctx->response.header);
-  static const char kSxgContentType[] = "application/signed-exchange;v=b3";
-  ngx_str_set(&req->headers_out.content_type, kSxgContentType);  // must be SXG
+  ngx_table_elt_t* server = req->headers_out.server;
+  // Cleanup outer header.
+  ngx_memzero(&req->headers_out, sizeof(ngx_http_headers_out_t));
+  if (ngx_list_init(&req->headers_out.headers, req->pool, 1,
+                    sizeof(ngx_table_elt_t)) != NGX_OK) {
+    ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
+                  "nginx-sxg-module: failed to initialize outer header list");
+    return NGX_ERROR;
+  }
+
+  // Append nosniff to the new outer header entry.
+  ngx_table_elt_t* x_content_type_options =
+      ngx_list_push(&req->headers_out.headers);
+  x_content_type_options->hash = 1;
+  ngx_str_set(&x_content_type_options->key, "X-Content-Type-Options");
+  ngx_str_set(&x_content_type_options->value, "nosniff");
+
+  // Modify out of list outer header entries.
+  ngx_str_set(&req->headers_out.content_type,
+              "application/signed-exchange;v=b3");
   req->headers_out.content_type_len = req->headers_out.content_type.len;
-  req->headers_out.content_type_lowcase = NULL;
 
   sxg_buffer_t sxg = sxg_empty_buffer();
   bool success = generate_sxg(req, ctx, &sxg);
@@ -910,7 +929,7 @@ static ngx_int_t ngx_http_cert_chain_handler(ngx_http_request_t* req) {
   if (refreshed) {
     ngx_log_error(
         NGX_LOG_INFO, req->connection->log, 0,
-        "nginx-sxg-module: OCSP Response in Certificate-Chain is refreshed.");
+        "nginx-sxg-module: OCSP Response in Certificate-Chain is refreshed");
   }
   req->headers_out.status = NGX_HTTP_OK;
   req->headers_out.content_length_n =
@@ -924,13 +943,13 @@ static ngx_int_t ngx_http_cert_chain_handler(ngx_http_request_t* req) {
   if (!make_chain_from_buffer(req, &slc->cert_chain.serialized_cert_chain,
                               &out)) {
     ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                  "nginx-sxg-module: failed to generate Cert-Chain.");
+                  "nginx-sxg-module: failed to generate Cert-Chain");
     return NGX_ERROR;
   }
   if (ngx_http_next_header_filter(req) != NGX_OK ||
       ngx_http_next_body_filter(req, out) != NGX_OK) {
     ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
-                  "nginx-sxg-module: failed to return payload.");
+                  "nginx-sxg-module: failed to return payload");
     return NGX_ERROR;
   }
   return NGX_DONE;
