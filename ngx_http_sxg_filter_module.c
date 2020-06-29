@@ -827,7 +827,7 @@ static ngx_int_t ngx_http_sxg_body_filter_impl(ngx_http_request_t* req,
   }
 
   sxg_header_append_string("content-type",
-                           (const char*)req->headers_out.content_type->data,
+                           (const char*)req->headers_out.content_type.data,
                            &ctx->response.header);
   static const char kSxgContentType[] = "application/signed-exchange;v=b3";
   ngx_str_set(&req->headers_out.content_type, kSxgContentType);  // must be SXG
