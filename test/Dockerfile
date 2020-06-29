@@ -18,6 +18,8 @@ COPY sxg.crt .
 COPY sxg.key .
 COPY nginx-sxg.conf /etc/nginx/sites-enabled/
 COPY index.html /var/www/nginx-sxg.test/
+COPY index.html /var/www/nginx-sxg.test/foo/
+COPY index.html /var/www/nginx-sxg.test/bar/
 RUN mkdir result
 RUN chmod 755 -R /var/www/nginx-sxg.test/
 
