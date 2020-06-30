@@ -2,7 +2,7 @@
 
 if ! service nginx restart; then
   cat /var/log/nginx/error.log
-  return 1
+  exit 1
 fi
 
 rm -rf out
