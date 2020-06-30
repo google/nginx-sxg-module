@@ -35,10 +35,9 @@ jobs:
           mkdir out
           docker build --build-arg base_image=${{ matrix.names.base_image }} -t nginx .
           docker run --mount type=bind,src=$(pwd)/out,dst=/data/result nginx
-          echo "hello, now try to test"
-          test $(md5sum out/index.sxg | cut -d' ' -f 1) != "633a359d9e12522fe26a671927b989e8"
-          test $(md5sum out/index.html | cut -d' ' -f 1) = "633a359d9e12522fe26a671927b989e8"
-          test $(md5sum out/http.html | cut -d' ' -f 1) = "633a359d9e12522fe26a671927b989e8"
+          ! echo "633a359d9e12522fe26a671927b989e8  out/index.sxg" | md5sum -c -
+          echo "633a359d9e12522fe26a671927b989e8  out/index.html" | md5sum -c -
+          echo "633a359d9e12522fe26a671927b989e8  out/http.html" | md5sum -c -
           popd
 
       - name: Extract results
