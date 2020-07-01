@@ -831,13 +831,18 @@ static ngx_int_t ngx_http_sxg_body_filter_impl(ngx_http_request_t* req,
     return NGX_ERROR;
   }
 
-  ngx_table_elt_t* server = req->headers_out.server;
-  // Cleanup outer header.
+  // Cleanup outer headers and trailers.
   ngx_memzero(&req->headers_out, sizeof(ngx_http_headers_out_t));
   if (ngx_list_init(&req->headers_out.headers, req->pool, 1,
                     sizeof(ngx_table_elt_t)) != NGX_OK) {
     ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
                   "nginx-sxg-module: failed to initialize outer header list");
+    return NGX_ERROR;
+  }
+  if (ngx_list_init(&req->headers_out.trailers, req->pool, 1,
+                    sizeof(ngx_table_elt_t)) != NGX_OK) {
+    ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
+                  "nginx-sxg-module: failed to initialize trailers list");
     return NGX_ERROR;
   }
 
