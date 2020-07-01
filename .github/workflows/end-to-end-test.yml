@@ -35,15 +35,19 @@ jobs:
           mkdir out
           docker build --build-arg base_image=${{ matrix.names.base_image }} -t nginx .
           docker run --mount type=bind,src=$(pwd)/out,dst=/data/result nginx
-          test $(md5sum out/index.sxg | awk '{print $1}') != "633a359d9e12522fe26a671927b989e8"
-          test $(md5sum out/index.html | awk '{print $1}') == "633a359d9e12522fe26a671927b989e8"
-          test $(md5sum out/http.html | awk '{print $1}') == "633a359d9e12522fe26a671927b989e8"
+          ! echo "633a359d9e12522fe26a671927b989e8  out/index.sxg" | md5sum -c -
+          echo "633a359d9e12522fe26a671927b989e8  out/index.html" | md5sum -c -
+          echo "633a359d9e12522fe26a671927b989e8  out/http.html" | md5sum -c -
           popd
 
       - name: Extract results
         run: |
           cat test/out/error.log
           cat test/out/index.sxg
+
+      - name: check output header does not include etag
+        run: |
+          if grep -qi "etag" test/out/index.header ; then exit 1; fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v1
