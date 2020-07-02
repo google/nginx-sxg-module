@@ -852,8 +852,7 @@ static ngx_int_t ngx_http_sxg_body_filter_impl(ngx_http_request_t* req,
   x_content_type_options->hash = 1;
   ngx_str_set(&x_content_type_options->key, "X-Content-Type-Options");
   ngx_str_set(&x_content_type_options->value, "nosniff");
-  ngx_table_elt_t* vary =
-      ngx_list_push(&req->headers_out.headers);
+  ngx_table_elt_t* vary = ngx_list_push(&req->headers_out.headers);
   vary->hash = 1;
   ngx_str_set(&vary->key, "Vary");
   ngx_str_set(&vary->value, "Accept");
