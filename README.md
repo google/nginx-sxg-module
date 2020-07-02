@@ -84,8 +84,6 @@ http {
     server {
         listen    80;
         server_name  example.com;
-        add_header X-Content-Type-Options nosniff;
-        add_header Vary Accept;
 
         sxg on;
         sxg_certificate     /path/to/certificate-ecdsa.pem;
