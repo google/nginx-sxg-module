@@ -373,6 +373,8 @@ static ngx_int_t subresource_fetch_handler_impl(ngx_http_request_t* req,
                 "nginx-sxg-module: Subresource fetched. bytes=%l/%l",
                 req->out->buf->last - req->out->buf->pos,
                 req->upstream->length);
+
+  // if the request hit the proxy cache, req->upstream->length is -1.
   if (req->out->buf->last - req->out->buf->pos == req->upstream->length ||
       req->upstream->length == -1) {
     ngx_http_set_ctx(req, ctx, ngx_http_sxg_filter_module);
