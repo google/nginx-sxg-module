@@ -833,7 +833,7 @@ static ngx_int_t ngx_http_sxg_body_filter_impl(ngx_http_request_t* req,
 
   // Cleanup outer headers and trailers.
   ngx_memzero(&req->headers_out, sizeof(ngx_http_headers_out_t));
-  if (ngx_list_init(&req->headers_out.headers, req->pool, 1,
+  if (ngx_list_init(&req->headers_out.headers, req->pool, 2,
                     sizeof(ngx_table_elt_t)) != NGX_OK) {
     ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
                   "nginx-sxg-module: failed to initialize outer header list");
@@ -852,6 +852,10 @@ static ngx_int_t ngx_http_sxg_body_filter_impl(ngx_http_request_t* req,
   x_content_type_options->hash = 1;
   ngx_str_set(&x_content_type_options->key, "X-Content-Type-Options");
   ngx_str_set(&x_content_type_options->value, "nosniff");
+  ngx_table_elt_t* vary = ngx_list_push(&req->headers_out.headers);
+  vary->hash = 1;
+  ngx_str_set(&vary->key, "Vary");
+  ngx_str_set(&vary->value, "Accept");
 
   // Modify out of list outer header entries.
   ngx_str_set(&req->headers_out.content_type,
