@@ -179,11 +179,11 @@ bool highest_qvalue_is_sxg(const char* str, size_t len) {
 
 // Truncates optional white spaces at head and tail.
 static void strip(const char** str, size_t* len) {
-  while (**str == ' ' || **str == '\t') {
+  while (*len > 0 && (**str == ' ' || **str == '\t')) {
     ++*str;
     --*len;
   }
-  while ((*str)[*len - 1] == ' ' || (*str)[*len - 1] == '\t') {
+  while (*len > 0 && ((*str)[*len - 1] == ' ' || (*str)[*len - 1] == '\t')) {
     --*len;
   }
 }
@@ -193,8 +193,7 @@ static void strip(const char** str, size_t* len) {
 // |desired| must be null terminated.
 static bool quoted_string_match(const char* str, size_t len,
                                 const char* desired) {
-  strip(&str, &len);
-  if (str[0] != '"' || str[len - 1] != '"') {
+  if (len < 2 || str[0] != '"' || str[len - 1] != '"') {
     return false;
   }
   ++str;     // Skip '"'.
@@ -215,50 +214,63 @@ static bool quoted_string_match(const char* str, size_t len,
 
 bool param_is_preload(const char* param, size_t len) {
   strip(&param, &len);
-  static const char kRel[] = "rel=";
+  static const char kRel[] = "rel";
   static const char kPreload[] = "preload";
+
   if (len < sizeof(kRel) - 1 ||
-      strncmp((char*)param, kRel, sizeof(kRel) - 1) != 0) {
+      memcmp((char*)param, kRel, sizeof(kRel) - 1) != 0) {
     return false;
   }
   param += sizeof(kRel) - 1;
   len -= sizeof(kRel) - 1;
-  if (len > 0 && *param == '"') {
-    return quoted_string_match(param, len, kPreload);
-  } else {
-    strip(&param, &len);
-    return len == sizeof(kPreload) - 1 && memcmp(param, kPreload, len) == 0;
+  strip(&param, &len);
+
+  if (len < sizeof(kPreload) || param[0] != '=') {
+    return false;
   }
+  param++;
+  len--;
+  strip(&param, &len);
+
+  return quoted_string_match(param, len, kPreload) ||
+         (len == sizeof(kPreload) - 1 && memcmp(param, kPreload, len) == 0);
 }
 
 bool param_is_as(const char* param, size_t len, const char** value,
                  size_t* value_len) {
   strip(&param, &len);
-  static const char kRel[] = "as=";
+  static const char kAs[] = "as";
   *value = NULL;
   *value_len = 0;
-  if (len < sizeof(kRel) - 1 ||
-      strncmp((char*)param, kRel, sizeof(kRel) - 1) != 0) {
+
+  if (len < sizeof(kAs) - 1 ||
+      memcmp((char*)param, kAs, sizeof(kAs) - 1) != 0) {
     return false;
   }
-  param += sizeof(kRel) - 1;
-  len -= sizeof(kRel) - 1;
+  param += sizeof(kAs) - 1;
+  len -= sizeof(kAs) - 1;
   strip(&param, &len);
+
+  if (len == 0 || param[0] != '=') {
+    return false;
+  }
+  param++;
+  len--;
+  strip(&param, &len);
+
   if (len > 0 && *param == '"') {
     const char* end = strchr(param + 1, '"');
     if (end == NULL) {
       return false;
     }
     param += 1;
-    size_t len = end - param;
+    len = end - param;
     strip(&param, &len);
-    *value = param;
-    *value_len = len;
-  } else {
-    *value = param;
-    *value_len = len;
   }
-  return true;
+  *value = param;
+  *value_len = len;
+
+  return len > 0;
 }
 
 EVP_PKEY* load_private_key(const char* filepath) {
