@@ -68,6 +68,11 @@ An absolute path in which nginx will generate and serve the CBOR-encoded certifi
 But make sure that the OCSP responder for the certificate is accessible from your nginx server to get OCSP responses.
 This directive is optional.
 
+#### sxg\_expires\_seconds
+
+The life-span of SXG file in seconds. It must not be more than 604800 (1 weeek).
+This directive is optional. The default value is `86400` (1 day).
+
 ### Config Example
 
 ```
@@ -90,6 +95,7 @@ http {
         sxg_certificate_key /path/to/private-key-ecdsa.key;
         sxg_cert_url        https://cdn.test.com/example.com.cert.cbor;
         sxg_validity_url    https://example.com/validity/resource.msg;
+        sxg_expires_seconds 604800;
 
         location / {
             proxy_pass http://app;
