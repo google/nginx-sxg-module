@@ -68,10 +68,12 @@ An absolute path in which nginx will generate and serve the CBOR-encoded certifi
 But make sure that the OCSP responder for the certificate is accessible from your nginx server to get OCSP responses.
 This directive is optional.
 
-#### sxg\_expires\_seconds
+#### sxg\_expiry\_seconds
 
-The life-span of SXG file in seconds. It must not be more than 604800 (1 weeek).
-This directive is optional. The default value is `86400` (1 day).
+The life-span of generated SXG file in seconds.
+It must not be bigger than 604800 (1 week).
+This directive is optional.
+The default value is `86400` (1 day).
 
 ### Config Example
 

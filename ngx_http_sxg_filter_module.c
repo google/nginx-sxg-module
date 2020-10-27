@@ -37,7 +37,7 @@ typedef struct {
   ngx_str_t cert_url;
   ngx_str_t validity_url;
   ngx_str_t cert_path;
-  size_t expires_seconds;
+  time_t expiry_seconds;
   sxg_signer_list_t signers;
   ngx_sxg_cert_chain_t cert_chain;
 } ngx_http_sxg_loc_conf_t;
@@ -100,9 +100,9 @@ static ngx_command_t ngx_http_sxg_commands[] = {
     {ngx_string("sxg_cert_path"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
      ngx_conf_set_str_slot, NGX_HTTP_LOC_CONF_OFFSET,
      offsetof(ngx_http_sxg_loc_conf_t, cert_path), NULL},
-    {ngx_string("sxg_expires_seconds"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
-     ngx_conf_set_size_slot, NGX_HTTP_LOC_CONF_OFFSET,
-     offsetof(ngx_http_sxg_loc_conf_t, expires_seconds), NULL},
+    {ngx_string("sxg_expiry_seconds"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+     ngx_conf_set_sec_slot, NGX_HTTP_LOC_CONF_OFFSET,
+     offsetof(ngx_http_sxg_loc_conf_t, expiry_seconds), NULL},
     ngx_null_command};
 
 static ngx_http_module_t ngx_http_sxg_filter_module_ctx = {
@@ -155,7 +155,7 @@ static void* ngx_http_sxg_create_loc_conf(ngx_conf_t* cf) {
   slc->validity_url = (ngx_str_t){.data = NULL, .len = 0};
   slc->cert_path = (ngx_str_t){.data = NULL, .len = 0};
   slc->cert_chain = ngx_sxg_empty_cert_chain();
-  slc->expires_seconds = NGX_CONF_UNSET_SIZE;
+  slc->expiry_seconds = NGX_CONF_UNSET;
   slc->signers = sxg_empty_signer_list();
   return slc;
 }
@@ -172,8 +172,8 @@ static char* ngx_http_sxg_merge_loc_conf(ngx_conf_t* cf, void* parent,
   ngx_conf_merge_str_value(conf->cert_url, prev->cert_url, "");
   ngx_conf_merge_str_value(conf->validity_url, prev->validity_url, "");
   ngx_conf_merge_str_value(conf->cert_path, prev->cert_path, "");
-  ngx_conf_merge_size_value(conf->expires_seconds, prev->expires_seconds,
-                            60 * 60 * 24);  // 1 day.
+  ngx_conf_merge_sec_value(conf->expiry_seconds, prev->expiry_seconds,
+                           60 * 60 * 24);  // 1 day.
 
   if (!is_valid_config(cf, conf)) {
     if (conf->enable) {
@@ -225,11 +225,11 @@ static char* ngx_http_sxg_merge_loc_conf(ngx_conf_t* cf, void* parent,
     }
   }
 
-  if (conf->expires_seconds > 60 * 60 * 24 * 7) {
+  if (conf->expiry_seconds > 60 * 60 * 24 * 7) {
     // SXG life-span longer than 7 days is not allowed by spec.
     ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
                   "nginx-sxg-module: too long lifespan of SXG %d seconds",
-                  conf->expires_seconds);
+                  conf->expiry_seconds);
     return NGX_CONF_ERROR;
   }
 
@@ -275,7 +275,7 @@ static bool generate_sxg(const ngx_http_request_t* req,
   // Set parameters.
   sxg_signer_t* const signer = &slc->signers.signers[0];
   signer->date = time(NULL);
-  signer->expires = signer->date + slc->expires_seconds;
+  signer->expires = signer->date + slc->expiry_seconds;
 
   // Generate SXG.
   char* const fallback_url = construct_fallback_url(req);
