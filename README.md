@@ -97,7 +97,7 @@ http {
         sxg_certificate_key /path/to/private-key-ecdsa.key;
         sxg_cert_url        https://cdn.test.com/example.com.cert.cbor;
         sxg_validity_url    https://example.com/validity/resource.msg;
-        sxg_expires_seconds 604800;
+        sxg_expiry_seconds 604800;
 
         location / {
             proxy_pass http://app;
