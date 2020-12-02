@@ -931,7 +931,7 @@ static bool is_valid_config(ngx_conf_t* nc, const ngx_http_sxg_loc_conf_t* sc) {
     valid = false;
     if (sc->enable) {
       ngx_log_error(NGX_LOG_CRIT, nc->log, 0,
-                    "nginx-sxg-module: sxg_certificate_url not specified");
+                    "nginx-sxg-module: sxg_cert_url not specified");
     }
   }
   return valid;
