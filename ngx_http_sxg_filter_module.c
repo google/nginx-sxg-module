@@ -221,6 +221,11 @@ static char* ngx_http_sxg_merge_loc_conf(ngx_conf_t* cf, void* parent,
     if (conf->cert_path.len > 0 &&
         !load_cert_chain((const char*)conf->certificate.data,
                          &conf->cert_chain)) {
+      ngx_log_error(
+          NGX_LOG_EMERG, cf->log, 0,
+          "nginx-sxg-module: failed to load Cert-Chain at %V (sxg_cert_path "
+          "cannot be used if you are using a self-signed certificate)",
+          &conf->certificate);
       return NGX_CONF_ERROR;
     }
   }
