@@ -1,6 +1,0 @@
-HTTP/1.1 000
-Content-Type: application/signed-exchange;v=b3
-Content-Length: 682
-Connection: keep-alive
-X-Content-Type-Options: nosniff
-Vary: Accept

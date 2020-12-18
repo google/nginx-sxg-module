@@ -856,7 +856,7 @@ static ngx_int_t ngx_http_sxg_body_filter_impl(ngx_http_request_t* req,
                   "nginx-sxg-module: failed to initialize trailers list");
     return NGX_ERROR;
   }
-
+  req->headers_out.status = NGX_HTTP_OK;
   // Append nosniff to the new outer header entry.
   ngx_table_elt_t* x_content_type_options =
       ngx_list_push(&req->headers_out.headers);
