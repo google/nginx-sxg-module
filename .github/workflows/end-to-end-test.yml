@@ -49,7 +49,7 @@ jobs:
         run: |
           if grep -qi "etag" test/out/index.header ; then exit 1; fi
 
-      - name: check status code is must be 200
+      - name: check status code to be 200
         run: |
           if [ "$(head -n1 test/out/index.header)" != "HTTP/1.1 200" ]; then exit 1; fi
 
