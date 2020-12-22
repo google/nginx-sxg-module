@@ -4,7 +4,7 @@
 
 Signed HTTP Exchange (SXG) support for nginx. Nginx will convert responses from
 the upstream application into SXG when client requests include the `Accept:
-application/signed-exchane;v=b3` HTTP header with highest qvalue.
+application/signed-exchange;v=b3` HTTP header with highest qvalue.
 
 ## Installation
 
