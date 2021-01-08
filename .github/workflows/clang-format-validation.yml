@@ -2,7 +2,7 @@ name: Validate code format with clang-format
 on: [push, pull_request]
 jobs:
   validate:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
 
