@@ -79,7 +79,7 @@ The default value is `86400` (1 day).
 
 The hostname of fallback url of generated SXG file.
 This directive is optional.
-The default value is use `Host` header field value.
+The default value is Host field parameter of HTTP request header.
 
 ### Config Example
 
