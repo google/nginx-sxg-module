@@ -38,6 +38,7 @@ typedef struct {
   ngx_str_t validity_url;
   ngx_str_t cert_path;
   time_t expiry_seconds;
+  ngx_str_t fallback_host;
   sxg_signer_list_t signers;
   ngx_sxg_cert_chain_t cert_chain;
 } ngx_http_sxg_loc_conf_t;
@@ -69,7 +70,8 @@ static ngx_int_t ngx_http_sxg_filter_init(ngx_conf_t* cf);
 static void* ngx_http_sxg_create_loc_conf(ngx_conf_t* cf);
 static char* ngx_http_sxg_merge_loc_conf(ngx_conf_t* cf, void* parent,
                                          void* child);
-static char* construct_fallback_url(const ngx_http_request_t* r);
+static char* construct_fallback_url(const ngx_http_request_t* r,
+                                    ngx_str_t* fallback_host);
 static ngx_int_t subresource_fetch_handler_impl(ngx_http_request_t* req,
                                                 ngx_http_core_srv_conf_t* cscf,
                                                 ngx_http_sxg_ctx_t* ctx);
@@ -103,6 +105,9 @@ static ngx_command_t ngx_http_sxg_commands[] = {
     {ngx_string("sxg_expiry_seconds"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
      ngx_conf_set_sec_slot, NGX_HTTP_LOC_CONF_OFFSET,
      offsetof(ngx_http_sxg_loc_conf_t, expiry_seconds), NULL},
+    {ngx_string("sxg_fallback_host"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+     ngx_conf_set_str_slot, NGX_HTTP_LOC_CONF_OFFSET,
+     offsetof(ngx_http_sxg_loc_conf_t, fallback_host), NULL},
     ngx_null_command};
 
 static ngx_http_module_t ngx_http_sxg_filter_module_ctx = {
@@ -156,6 +161,7 @@ static void* ngx_http_sxg_create_loc_conf(ngx_conf_t* cf) {
   slc->cert_path = (ngx_str_t){.data = NULL, .len = 0};
   slc->cert_chain = ngx_sxg_empty_cert_chain();
   slc->expiry_seconds = NGX_CONF_UNSET;
+  slc->fallback_host = (ngx_str_t){.data = NULL, .len = 0};
   slc->signers = sxg_empty_signer_list();
   return slc;
 }
@@ -174,6 +180,7 @@ static char* ngx_http_sxg_merge_loc_conf(ngx_conf_t* cf, void* parent,
   ngx_conf_merge_str_value(conf->cert_path, prev->cert_path, "");
   ngx_conf_merge_sec_value(conf->expiry_seconds, prev->expiry_seconds,
                            60 * 60 * 24);  // 1 day.
+  ngx_conf_merge_str_value(conf->fallback_host, prev->fallback_host, "");
 
   if (!is_valid_config(cf, conf)) {
     if (conf->enable) {
@@ -283,7 +290,7 @@ static bool generate_sxg(const ngx_http_request_t* req,
   signer->expires = signer->date + slc->expiry_seconds;
 
   // Generate SXG.
-  char* const fallback_url = construct_fallback_url(req);
+  char* const fallback_url = construct_fallback_url(req, &slc->fallback_host);
   sxg_encoded_response_t content = sxg_empty_encoded_response();
   bool success = fallback_url != NULL &&
                  sxg_encode_response(4096, &ctx->response, &content) &&
@@ -695,9 +702,12 @@ static ngx_int_t ngx_http_sxg_header_filter(ngx_http_request_t* req) {
   return ret;
 }
 
-static char* construct_fallback_url(const ngx_http_request_t* req) {
+static char* construct_fallback_url(const ngx_http_request_t* req,
+                                    ngx_str_t* fallback_host) {
   static const char kHttpsPrefix[] = "https://";
-  const char* host = (const char*)req->headers_in.host->value.data;
+  const char* host = fallback_host->len > 0
+                         ? (const char*)fallback_host->data
+                         : (const char*)req->headers_in.host->value.data;
   int fallback_url_length =
       sizeof(kHttpsPrefix) + strlen(host) + req->unparsed_uri.len;
   char* fallback_url = ngx_palloc(req->pool, fallback_url_length + 1);

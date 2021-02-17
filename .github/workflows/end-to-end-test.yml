@@ -51,7 +51,7 @@ jobs:
 
       - name: Check status code to be 200
         run: |
-          if [ "$(head -n1 test/out/index.header)" != "HTTP/1.1 200" ]; then exit 1; fi
+          if [ "$(head -n1 test/out/index.header)" != "HTTP/1.1 200 OK" ]; then exit 1; fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v1

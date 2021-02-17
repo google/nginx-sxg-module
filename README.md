@@ -75,6 +75,12 @@ It must not be bigger than 604800 (1 week).
 This directive is optional.
 The default value is `86400` (1 day).
 
+#### sxg\_fallback\_host
+
+The hostname of fallback url of generated SXG file.
+This directive is optional.
+The default value is Host field parameter of HTTP request header.
+
 ### Config Example
 
 ```
@@ -98,6 +104,7 @@ http {
         sxg_cert_url        https://cdn.test.com/example.com.cert.cbor;
         sxg_validity_url    https://example.com/validity/resource.msg;
         sxg_expiry_seconds 604800;
+        sxg_fallback_host  example.com;
 
         location / {
             proxy_pass http://app;
