@@ -14,7 +14,8 @@ details.
 
 If building from source and you have libsxg installed in a non-system
 directory, edit `config` to add `ngx_module_incs=path/to/include` and add
-`-Lpath/to/lib` to the existing `ngx_module_libs`.
+`-Lpath/to/lib` to the existing `ngx_module_libs`. You may also need to launch
+nginx with `LD_LIBRARY_PATH=path/to/lib`.
 
 ## Configuration
 
