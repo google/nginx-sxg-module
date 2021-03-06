@@ -12,6 +12,11 @@ There are two options for installation: Debian package or build from source. See
 [this article](https://web.dev/how-to-set-up-signed-http-exchanges/) for more
 details.
 
+If building from source and you have libsxg installed in a non-system
+directory, edit `config` to add `ngx_module_incs=path/to/include` and add
+`-Lpath/to/lib` to the existing `ngx_module_libs`, and launch nginx with
+`LD_LIBRARY_PATH=path/to/lib`.
+
 ## Configuration
 
 Nginx-SXG module requires configuration on nginx.
