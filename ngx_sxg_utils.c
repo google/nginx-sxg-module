@@ -406,6 +406,7 @@ bool refresh_if_needed(ngx_sxg_cert_chain_t* target) {
   if (target->ocsp != NULL) {
     OCSP_RESPONSE_free(target->ocsp);
   }
+  sxg_buffer_resize(0, &target->serialized_cert_chain);
   return sxg_fetch_ocsp_response(target->certificate, target->issuer,
                                  &target->ocsp) &&
          write_cert_chain(target, &target->serialized_cert_chain);
