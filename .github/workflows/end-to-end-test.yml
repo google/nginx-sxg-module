@@ -1,5 +1,6 @@
 name: 'End-to-end test with docker'
 on: push
+runs-on: self-hosted
 
 jobs:
   build:
