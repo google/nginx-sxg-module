@@ -1,10 +1,9 @@
 name: 'Release .deb files'
 on: release
-runs-on: self-hosted
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     strategy:
       matrix:
         names:
