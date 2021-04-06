@@ -25,7 +25,8 @@ Nginx-SXG module requires configuration on nginx.
 
 #### sxg
 
-Activation flag of SXG module.
+Activation flag of SXG module. This can be set or overriden inside `server`
+and `location` directives.
 
 - `on`: Enable this plugin.
 - `off`: Disable this plugin.
@@ -35,7 +36,8 @@ Default value is `off`.
 #### sxg\_certificate
 
 Full path for the certificate file. The certificate requires all of the
-conditions below to match.
+conditions below to match. This and all below directives can only be set
+inside `server` directives.
 
 - Has `CanSignHttpExchanges` extension.
 - Uses ECDSA256 or ECDSA384.
