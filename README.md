@@ -25,7 +25,7 @@ Nginx-SXG module requires configuration on nginx.
 
 #### sxg
 
-Activation flag of SXG module.
+Activation flag of SXG module. This can be set or overriden inside `location` directives.
 
 - `on`: Enable this plugin.
 - `off`: Disable this plugin.
