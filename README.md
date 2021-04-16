@@ -132,4 +132,19 @@ This functionality is essential to subresource preloading for faster cross-site 
     must match the externally-addressable host:port of the subresources.
   - Their responses must be no larger than the configured
     [`subrequest_output_buffer_size`](https://nginx.org/en/docs/http/ngx_http_core_module.html#subrequest_output_buffer_size).
-  - Their responses must come from an upstream server, such as via `proxy_pass`.
+  - Their responses must come from an upstream server, such as via
+    [`proxy_pass`](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass).
+    The upstream may optionally be named via
+    [`upstream`](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#upstream).
+
+To ensure subresource prefetching works, verify that the `header-integrity` in:
+
+```bash
+curl -H 'Accept: application/signed-exchange;v=b3' https://url/of/page.html | dump-signedexchange -payload=false | grep Link:
+```
+
+equals the value of:
+
+```bash
+curl -H 'Accept: application/signed-exchange;v=b3' https://url/of/subresource.jpg | dump-signedexchange -headerIntegrity
+```
