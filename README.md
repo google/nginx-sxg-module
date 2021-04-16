@@ -1,4 +1,4 @@
-# NGINX SXG extension
+# NGINX SXG module
 
 [![Build Status](https://travis-ci.org/google/nginx-sxg-module.svg?branch=master)](https://travis-ci.org/google/nginx-sxg-module)
 
