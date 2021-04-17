@@ -411,8 +411,8 @@ static ngx_int_t subresource_fetch_handler_impl(ngx_http_request_t* req,
       for (size_t j = 0; j < i->nelts; ++j) {
         ngx_table_elt_t* elts = i->elts;
         ngx_log_error(NGX_LOG_DEBUG, req->connection->log, 0,
-                      "nginx-sxg-module: Subresource %V: %V",
-                      &elts[j].key, &elts[j].value);
+                      "nginx-sxg-module: Subresource %V: %V", &elts[j].key,
+                      &elts[j].value);
       }
     }
   }
