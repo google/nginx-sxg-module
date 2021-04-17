@@ -396,10 +396,26 @@ static ngx_int_t subresource_fetch_handler_impl(ngx_http_request_t* req,
     --ctx->subresources;
     return NGX_OK;
   }
-  ngx_log_error(NGX_LOG_DEBUG, req->connection->log, 0,
-                "nginx-sxg-module: Subresource fetched. bytes=%l/%l",
-                req->out->buf->last - req->out->buf->pos,
-                req->upstream->length);
+  if (req->connection->log->log_level >= NGX_LOG_DEBUG) {
+    ngx_log_error(NGX_LOG_DEBUG, req->connection->log, 0,
+                  "nginx-sxg-module: Subresource fetched. bytes=%l/%l",
+                  req->out->buf->last - req->out->buf->pos,
+                  req->upstream->length);
+    ngx_log_error(NGX_LOG_DEBUG, req->connection->log, 0,
+                  "nginx-sxg-module: Subresource uri: %V", &req->uri);
+    ngx_log_error(NGX_LOG_DEBUG, req->connection->log, 0,
+                  "nginx-sxg-module: Subresource content-type: %V",
+                  &req->headers_out.content_type);
+    for (ngx_list_part_t* i = &req->headers_out.headers.part; i != NULL;
+         i = i->next) {
+      for (size_t j = 0; j < i->nelts; ++j) {
+        ngx_table_elt_t* elts = i->elts;
+        ngx_log_error(NGX_LOG_DEBUG, req->connection->log, 0,
+                      "nginx-sxg-module: Subresource %V: %V",
+                      &elts[j].key, &elts[j].value);
+      }
+    }
+  }
 
   // if the request hit the proxy cache, req->upstream->length is -1.
   if (req->out->buf->last - req->out->buf->pos == req->upstream->length ||

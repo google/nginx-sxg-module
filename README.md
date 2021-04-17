@@ -136,6 +136,12 @@ This functionality is essential to subresource preloading for faster cross-site 
     [`proxy_pass`](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_pass).
     The upstream may optionally be named via
     [`upstream`](https://nginx.org/en/docs/http/ngx_http_upstream_module.html#upstream).
+  - If [using variables in
+    `proxy_pass`](http://nginx.org/en/docs/http/ngx_http_proxy_module.html#non_idempotent:~:text=When%20variables%20are%20used%20in%20proxy_pass),
+    use
+    [`$uri`](http://nginx.org/en/docs/http/ngx_http_core_module.html#var_uri:~:text=1.2.7%29-,%24uri,current%20URI%20in%20request)
+    instead of
+    [`$request_uri`](http://nginx.org/en/docs/http/ngx_http_core_module.html#var_request_uri:~:text=%24request_uri,full%20original%20request%20URI).
 
 To ensure subresource prefetching works, verify that the `header-integrity` in:
 
