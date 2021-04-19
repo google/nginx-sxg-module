@@ -3,7 +3,7 @@ on: push
 
 jobs:
   build:
-    runs-on: ubunutu-latest
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         names:
