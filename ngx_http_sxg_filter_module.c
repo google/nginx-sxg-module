@@ -270,8 +270,8 @@ static bool response_should_be_sxg(const ngx_http_request_t* const req) {
       if (table[i].key.len == strlen(kAccept) &&
           strncasecmp((const char*)table[i].key.data, kAccept,
                       table[i].key.len) == 0 &&
-          highest_qvalue_is_sxg((const char*)table[i].value.data,
-                                table[i].value.len)) {
+          sxg_qvalue_is_1((const char*)table[i].value.data,
+                          table[i].value.len)) {
         return true;
       }
     }

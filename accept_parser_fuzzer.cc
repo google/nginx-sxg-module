@@ -22,6 +22,6 @@
 #include "ngx_sxg_utils.h"
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  highest_qvalue_is_sxg(reinterpret_cast<const char *>(data), size);
+  sxg_qvalue_is_1(reinterpret_cast<const char *>(data), size);
   return 0;
 }

@@ -27,9 +27,11 @@ set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra -std=c99 -fPIC -g -ggdb")
 set_property (DIRECTORY ${PROJECT_SOURCE_DIR} PROPERTY EP_UPDATE_DISCONNECTED 1)
 
 find_package (OpenSSL REQUIRED)
+find_library (LIBSXG NAMES sxg)
 
 add_library (ngx_sxg_utils SHARED ngx_sxg_utils.c)
-target_link_libraries (ngx_sxg_utils PRIVATE sxg ${OPENSSL_LIBRARIES})
+include_directories(/home/twifkak/usr/include)
+target_link_libraries (ngx_sxg_utils PRIVATE ${LIBSXG} ${OPENSSL_LIBRARIES})
 
 # This target requires cmake-format executable in your path.
 add_custom_target (

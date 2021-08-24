@@ -34,23 +34,24 @@ TEST(NgxSxgUtilsTest, TermLength) {
 }
 
 bool ShouldBeSXG(const std::string& input) {
-  return highest_qvalue_is_sxg(input.data(), input.size());
+  return sxg_qvalue_is_1(input.data(), input.size());
 }
 
 TEST(NgxSxgUtilsTest, ShouldBeSignedExchange) {
   EXPECT_TRUE(ShouldBeSXG("application/signed-exchange;v=b3"));
-  EXPECT_TRUE(ShouldBeSXG("application/signed-exchange; q=0.8 ; v=b3 "));
-  EXPECT_TRUE(ShouldBeSXG("application/signed-exchange; v=b3 ; q=0.7 "));
   EXPECT_TRUE(
-      ShouldBeSXG("text/html;q=0.1,application/signed-exchange;Q=0.9;v=b3 "));
-  EXPECT_TRUE(ShouldBeSXG("application/signed-exchange ; q=0.8 ; v=b3 "));
-  EXPECT_TRUE(ShouldBeSXG("application/signed-exchange;Q=0.8;V=\"b3\""));
+      ShouldBeSXG("application/signed-exchange;v=b3,"
+                  "application/signed-exchange;v=b3;q=0.9"));
+  EXPECT_TRUE(
+      ShouldBeSXG("application/signed-exchange;v=b3;q=0.9,"
+                  "application/signed-exchange;v=b3"));
+  EXPECT_TRUE(
+      ShouldBeSXG("text/html;q=0.1,application/signed-exchange;Q=1;v=b3 "));
+  EXPECT_TRUE(ShouldBeSXG("application/signed-exchange;V=\"b3\";Q=1"));
   EXPECT_TRUE(
       ShouldBeSXG("application/signed-exchange;v=b3; q=1. ,text/html;q=0.999"));
   EXPECT_TRUE(ShouldBeSXG(
       "application/signed-exchange;v=b3;q=1.000   ,text/html;q=0.999"));
-  EXPECT_TRUE(ShouldBeSXG(
-      "application/signed-exchange;q=0.999; v=b3 ,text/html; q=0.998 "));
   EXPECT_TRUE(ShouldBeSXG("application/signed-exchange;v=b3,text/html"));
   EXPECT_TRUE(ShouldBeSXG("*/*,text/html,application/signed-exchange;v=b3"));
   EXPECT_FALSE(ShouldBeSXG("v=b3"));
@@ -60,8 +61,10 @@ TEST(NgxSxgUtilsTest, ShouldBeSignedExchange) {
       ShouldBeSXG("application/signed-exchange;q=0.99a;v=b3,text/html;q=0.5"));
   EXPECT_FALSE(
       ShouldBeSXG("application/signed-exchange;q=0.8     ;v=b3,text/html;q=1"));
+  EXPECT_FALSE(ShouldBeSXG("application/signed-exchange; v=b3 ; q=0.8 "));
+  EXPECT_FALSE(ShouldBeSXG("application/signed-exchange;V=\"b3\";Q=0.8"));
   EXPECT_FALSE(ShouldBeSXG(
-      "application/signed-exchange;q=0.998;v=b3,text/html;q=0.999"));
+      "application/signed-exchange;v=b3;q=0.999,text/html;q=0.998"));
   EXPECT_FALSE(ShouldBeSXG("text/html"));
   EXPECT_FALSE(ShouldBeSXG("application/signed-exchange;v=b2"));
   EXPECT_FALSE(ShouldBeSXG("application/signed-exchange;v=;;,;;"));

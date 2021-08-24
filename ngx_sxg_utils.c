@@ -160,21 +160,16 @@ static int get_priority(const char* str, size_t len) {
   return 1000;
 }
 
-bool highest_qvalue_is_sxg(const char* str, size_t len) {
-  int max_priority = 0;
-  bool should_be_sxg = false;
+bool sxg_qvalue_is_1(const char* str, size_t len) {
   for (const char* const end = str + len; str < end;) {
     const size_t tail = get_term_length(str, len, ',', "<>");
-    const bool is_sxg = term_is_sxg(str, tail);
-    const int p = get_priority(str, tail);
-    if (max_priority < p || (max_priority == p && is_sxg)) {
-      should_be_sxg = is_sxg;
-      max_priority = p;
+    if (term_is_sxg(str, tail) && get_priority(str, tail) == 1000) {
+      return true;
     }
     str += tail + 1;
     len -= tail + 1;
   }
-  return should_be_sxg;
+  return false;
 }
 
 // Truncates optional white spaces at head and tail.
