@@ -47,8 +47,8 @@ size_t get_term_length(const char* str, size_t len, char delimiter,
                        const char quotes[2]);
 
 // Decides response should be SXG or not from HTTP accept header.
-// e.g. application/signed-exchange;q=0.9;v=b3,text/html;q=0.8 -> true
-bool highest_qvalue_is_sxg(const char* param, size_t len);
+// e.g. application/signed-exchange;v=b3,text/html;q=0.8 -> true
+bool sxg_qvalue_is_1(const char* param, size_t len);
 
 // Detects rel="preload" parameter in HTTP link header.
 // e.g. rel="foo preload bar" -> true
