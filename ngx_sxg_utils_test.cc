@@ -39,10 +39,12 @@ bool ShouldBeSXG(const std::string& input) {
 
 TEST(NgxSxgUtilsTest, ShouldBeSignedExchange) {
   EXPECT_TRUE(ShouldBeSXG("application/signed-exchange;v=b3"));
-  EXPECT_TRUE(ShouldBeSXG("application/signed-exchange;v=b3,"
-                          "application/signed-exchange;v=b3;q=0.9"));
-  EXPECT_TRUE(ShouldBeSXG("application/signed-exchange;v=b3;q=0.9,"
-                          "application/signed-exchange;v=b3"));
+  EXPECT_TRUE(
+      ShouldBeSXG("application/signed-exchange;v=b3,"
+                  "application/signed-exchange;v=b3;q=0.9"));
+  EXPECT_TRUE(
+      ShouldBeSXG("application/signed-exchange;v=b3;q=0.9,"
+                  "application/signed-exchange;v=b3"));
   EXPECT_TRUE(
       ShouldBeSXG("text/html;q=0.1,application/signed-exchange;Q=1;v=b3 "));
   EXPECT_TRUE(ShouldBeSXG("application/signed-exchange;V=\"b3\";Q=1"));
