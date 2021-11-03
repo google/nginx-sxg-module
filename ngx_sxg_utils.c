@@ -17,6 +17,7 @@
 #include "ngx_sxg_utils.h"
 
 #include <ctype.h>
+#include <ngx_core.h>
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
@@ -325,7 +326,7 @@ bool load_cert_chain(const char* cert_path, ngx_sxg_cert_chain_t* target) {
   return cert != NULL && issuer != NULL;
 }
 
-bool write_cert_chain(ngx_sxg_cert_chain_t* cert, sxg_buffer_t* dst) {
+bool write_cert_chain(const ngx_sxg_cert_chain_t* cert, sxg_buffer_t* dst) {
   sxg_buffer_t empty_sct_list = sxg_empty_buffer();
   sxg_cert_chain_t chain = sxg_empty_cert_chain();
   bool success =
@@ -333,7 +334,12 @@ bool write_cert_chain(ngx_sxg_cert_chain_t* cert, sxg_buffer_t* dst) {
                                  &chain) &&
       sxg_cert_chain_append_cert(cert->issuer, NULL, &empty_sct_list, &chain) &&
       sxg_write_cert_chain_cbor(&chain, dst);
-  sxg_cert_chain_release(&chain);
+  // Don't call sxg_cert_chain_release, as it would also free
+  // cert->certificate, cert->ocsp, and cert->issuer.
+  if (chain.certs != NULL) {
+    OPENSSL_free(chain.certs);
+  }
+  sxg_buffer_release(&empty_sct_list);
   return success;
 }
 
@@ -358,36 +364,31 @@ static bool check_refresh_needed(ngx_sxg_cert_chain_t* target) {
   const int resps = OCSP_resp_count(br);
   for (int i = 0; i < resps; ++i) {
     OCSP_SINGLERESP* leaf = OCSP_resp_get0(br, i);
-    int revocation_reason;
-    ASN1_GENERALIZEDTIME* revocation_time;
     ASN1_GENERALIZEDTIME* this_update;
     ASN1_GENERALIZEDTIME* next_update;
 
-    int status = OCSP_single_get0_status(
-        leaf, &revocation_reason, &revocation_time, &this_update, &next_update);
+    int status = OCSP_single_get0_status(leaf, /*revocation_reason=*/NULL,
+                                         /*revocation_time=*/NULL, &this_update,
+                                         &next_update);
     if (status == -1) {
       return true;
     }
 
     time_t since;
     time_t until;
-    time_t update;
     if (!asn1_generalizedtime_to_unixtime(this_update, &since) ||
         !asn1_generalizedtime_to_unixtime(next_update, &until)) {
       return true;
     }
 
-    // NextUpdate field is optional.
-    bool next_update_exists =
-        asn1_generalizedtime_to_unixtime(revocation_time, &update);
-
-    if (since < until) {
-      return false;
+    if (since >= until) {
+      // Unexpected error in the OCSP response; refresh immediately.
+      return true;
     }
     time_t middle_lifespan = since + ((until - since) / 2);
     const time_t now = time(NULL);
 
-    if (middle_lifespan < now || (next_update_exists && update < now)) {
+    if (middle_lifespan < now) {
       return true;
     }
   }

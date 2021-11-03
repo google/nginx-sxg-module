@@ -71,15 +71,17 @@ Maximum HTTP body size this module can generate SXG from. Default value is
 
 #### sxg\_cert\_path
 
-This directive is optional and experimental. The recommended approach is to use
+This directive is optional. If specified, this should be an absolute path
+corresponding to a file that will be served at the URL specified by
+`sxg_cert_url`. This plugin will then automatically generate and refresh the
+CBOR-encoded certificate file, given the PEM located at `sxg_certificate`. It
+requires that the OCSP responder for the certificate is accessible from your
+nginx server to get OCSP responses.
+
+Alternatively, use
 [`gen-certurl`](https://github.com/WICG/webpackage/blob/main/go/signedexchange/README.md)
 to generate a new `cert-chain+cbor` daily, and serve it statically at the URL
 specified by `sxg_cert_url`.
-
-If specified, this should be an absolute path in which nginx will generate and
-serve the CBOR-encoded certificate file, given the PEM located at
-`sxg_certificate`. It requires that the OCSP responder for the certificate is
-accessible from your nginx server to get OCSP responses.
 
 #### sxg\_expiry\_seconds
 

@@ -34,6 +34,8 @@
 extern "C" {
 #endif
 
+// Not thread-safe. Callers are responsible for protecting multithreaded
+// access, including via any of the below functions.
 typedef struct {
   sxg_buffer_t serialized_cert_chain;
   X509* certificate;
@@ -68,14 +70,14 @@ X509* load_x509_cert(const char* filepath);
 // Returns empty ngx_sxg_cert_chain_t.
 ngx_sxg_cert_chain_t ngx_sxg_empty_cert_chain();
 
-// Relase ngx_sxg_empty_cert_chain_t.
+// Release ngx_sxg_empty_cert_chain_t.
 void ngx_sxg_cert_chain_release(ngx_sxg_cert_chain_t* target);
 
 // Loads certificates for Certificate-Chain type.
 bool load_cert_chain(const char* cert_path, ngx_sxg_cert_chain_t* target);
 
 // Loads and serialize Cert-Chain to `dst`.
-bool write_cert_chain(ngx_sxg_cert_chain_t* cert, sxg_buffer_t* dst);
+bool write_cert_chain(const ngx_sxg_cert_chain_t* cert, sxg_buffer_t* dst);
 
 // Checks and refreshes the OCSP response. Returns true if refresh done.
 // Returns false if refresh is not required.
