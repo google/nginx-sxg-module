@@ -40,7 +40,10 @@ typedef struct {
   time_t expiry_seconds;
   ngx_str_t fallback_host;
   sxg_signer_list_t signers;
+
+  // Protected by cert_chain_lock;
   ngx_sxg_cert_chain_t cert_chain;
+  pthread_mutex_t cert_chain_lock;
 } ngx_http_sxg_loc_conf_t;
 
 typedef struct {
@@ -60,7 +63,7 @@ typedef struct {
   ngx_str_t link_header;
   ngx_array_t subresource_list;
 
-  // On accessing member, first you should get this lock.
+  // On accessing members, first you should get this lock.
   pthread_mutex_t lock;
 } ngx_http_sxg_ctx_t;
 
@@ -149,9 +152,17 @@ static char* str_to_null_terminated(ngx_pool_t* pool, const ngx_str_t* str) {
   return copied;
 }
 
+static void ngx_http_sxg_free_loc_conf(void* data) {
+  ngx_http_sxg_loc_conf_t* slc = data;
+  pthread_mutex_destroy(&slc->cert_chain_lock);
+}
+
 static void* ngx_http_sxg_create_loc_conf(ngx_conf_t* cf) {
-  ngx_http_sxg_loc_conf_t* slc =
-      ngx_palloc(cf->pool, sizeof(ngx_http_sxg_loc_conf_t));
+  ngx_pool_cleanup_t* cleanup =
+      ngx_pool_cleanup_add(cf->pool, sizeof(ngx_http_sxg_loc_conf_t));
+  cleanup->handler = ngx_http_sxg_free_loc_conf;
+
+  ngx_http_sxg_loc_conf_t* slc = cleanup->data;
   slc->enable = NGX_CONF_UNSET;
   slc->sxg_max_payload = NGX_CONF_UNSET_SIZE;
   slc->certificate = (ngx_str_t){.data = NULL, .len = 0};
@@ -159,10 +170,14 @@ static void* ngx_http_sxg_create_loc_conf(ngx_conf_t* cf) {
   slc->cert_url = (ngx_str_t){.data = NULL, .len = 0};
   slc->validity_url = (ngx_str_t){.data = NULL, .len = 0};
   slc->cert_path = (ngx_str_t){.data = NULL, .len = 0};
-  slc->cert_chain = ngx_sxg_empty_cert_chain();
   slc->expiry_seconds = NGX_CONF_UNSET;
   slc->fallback_host = (ngx_str_t){.data = NULL, .len = 0};
   slc->signers = sxg_empty_signer_list();
+  slc->cert_chain = ngx_sxg_empty_cert_chain();
+  if (pthread_mutex_init(&slc->cert_chain_lock, NULL) != 0) {
+    ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                  "nginx-sxg-module: failed to initialize cert_chain_lock");
+  }
   return slc;
 }
 
@@ -222,6 +237,20 @@ static char* ngx_http_sxg_merge_loc_conf(ngx_conf_t* cf, void* parent,
     X509_free(cert);
   }
 
+  if (pthread_mutex_lock(&prev->cert_chain_lock) != 0) {
+    ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                  "nginx-sxg-module: Failed to acquire cert_chain_lock");
+    return NGX_CONF_ERROR;
+  }
+  if (pthread_mutex_lock(&conf->cert_chain_lock) != 0) {
+    // NOTE: If the following unlock fails, it leaves prev->cert_chain_lock in
+    // a permanently locked state. I'm not sure if that's a problem in
+    // practice, given NGX_LOG_EMERG and NGX_CONF_ERROR.
+    pthread_mutex_unlock(&prev->cert_chain_lock);
+    ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                  "nginx-sxg-module: Failed to acquire cert_chain_lock");
+    return NGX_CONF_ERROR;
+  }
   if (prev->cert_chain.certificate != NULL && prev->cert_chain.issuer != NULL) {
     conf->cert_chain = prev->cert_chain;
   } else {
@@ -235,6 +264,11 @@ static char* ngx_http_sxg_merge_loc_conf(ngx_conf_t* cf, void* parent,
           &conf->certificate);
       return NGX_CONF_ERROR;
     }
+  }
+  if (pthread_mutex_unlock(&conf->cert_chain_lock) != 0 ||
+      pthread_mutex_unlock(&prev->cert_chain_lock) != 0) {
+    ngx_log_error(NGX_LOG_EMERG, cf->log, 0,
+                  "nginx-sxg-module: Failed to release cert_chain_lock");
   }
 
   if (conf->expiry_seconds > 60 * 60 * 24 * 7) {
@@ -976,6 +1010,11 @@ static ngx_int_t ngx_http_cert_chain_handler(ngx_http_request_t* req) {
       ngx_memcmp(req->uri.data, slc->cert_path.data, req->uri.len) != 0) {
     return NGX_OK;
   }
+  if (pthread_mutex_lock(&slc->cert_chain_lock) != 0) {
+    ngx_log_error(NGX_LOG_EMERG, req->connection->log, 0,
+                  "nginx-sxg-module: Failed to acquire cert_chain_lock");
+    return NGX_ERROR;
+  }
   bool refreshed = refresh_if_needed(&slc->cert_chain);
   if (refreshed) {
     ngx_log_error(
@@ -995,6 +1034,11 @@ static ngx_int_t ngx_http_cert_chain_handler(ngx_http_request_t* req) {
                               &out)) {
     ngx_log_error(NGX_LOG_ERR, req->connection->log, 0,
                   "nginx-sxg-module: failed to generate Cert-Chain");
+    return NGX_ERROR;
+  }
+  if (pthread_mutex_unlock(&slc->cert_chain_lock) != 0) {
+    ngx_log_error(NGX_LOG_EMERG, req->connection->log, 0,
+                  "nginx-sxg-module: Failed to release cert_chain_lock");
     return NGX_ERROR;
   }
   if (ngx_http_next_header_filter(req) != NGX_OK ||
